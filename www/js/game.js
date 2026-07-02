@@ -133,14 +133,13 @@
     const CUP_RIM_Y = 250;
     const CUP_PHYSICS_TOP_Y = 80; // invisible wall extension above visual rim (avoids top-corner bounce)
     const FLOOR_TOP_Y = 1100;
-    const MAX_CAT_SPEED = 14;
     const mergingBodyIds = new Set();
-    const GRAVITY_BASE = 1.45;
     const CHAOS_TILT_RAD = Math.PI / 8; // ~22.5° — proportional cup teeter, not sideways magnet
     const MOUSE_RADIUS = 22;
     /** TEMP: spawn two lvl-11 cats for easter-egg testing — set false before release */
     const DEBUG_ULTIMATE_EGG_TEST = false;
     let debugEggSpawned = false;
+    let totalDropsThisSession = 0;
     let cupLeftWall = null;
     let cupRightWall = null;
     let cupFloor = null;
@@ -233,9 +232,9 @@
     // --- Physics Engine Initialization ---
     function initPhysics() {
         engine = Engine.create({
-            gravity: { y: 1.45 },
-            positionIterations: 10,
-            velocityIterations: 8
+            gravity: { y: CatPhysics.GRAVITY_Y },
+            positionIterations: CatPhysics.POSITION_ITERATIONS,
+            velocityIterations: CatPhysics.VELOCITY_ITERATIONS
         });
 
         // Rigid boundaries — inner faces at x=80 / x=640; walls extend above visual rim so
@@ -244,18 +243,18 @@
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
         cupLeftWall = Bodies.rectangle(CUP_WALL_LEFT_X, wallCenterY, 20, wallHeight, { 
             isStatic: true, 
-            friction: 0.25, 
-            restitution: 0.18 
+            friction: CatPhysics.WALL_FRICTION, 
+            restitution: CatPhysics.WALL_RESTITUTION 
         });
         cupRightWall = Bodies.rectangle(CUP_WALL_RIGHT_X, wallCenterY, 20, wallHeight, { 
             isStatic: true, 
-            friction: 0.25, 
-            restitution: 0.18 
+            friction: CatPhysics.WALL_FRICTION, 
+            restitution: CatPhysics.WALL_RESTITUTION 
         });
         cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, 560, 20, { 
             isStatic: true, 
-            friction: 0.25, 
-            restitution: 0.18 
+            friction: CatPhysics.WALL_FRICTION, 
+            restitution: CatPhysics.WALL_RESTITUTION 
         });
 
         World.add(engine.world, [cupLeftWall, cupRightWall, cupFloor]);
@@ -399,12 +398,12 @@
         const isGoldenBall = isGoldenSpawn(spec);
         const level = isGoldenBall ? GameModes.GOLDEN_LEVEL : spec.level;
         const radius = getSpawnRadius(spec);
-        const radiusCollider = radius * 0.98;
+        const radiusCollider = radius * CatPhysics.COLLIDER_RADIUS_SCALE;
 
         let bodyOptions = {
-            friction: 0.25,
-            restitution: 0.38,
-            frictionAir: 0.0,
+            friction: CatPhysics.CAT_FRICTION,
+            restitution: CatPhysics.CAT_RESTITUTION,
+            frictionAir: CatPhysics.CAT_FRICTION_AIR,
             isStatic: !isDropped
         };
         bodyOptions = applySpecialPhysics(bodyOptions, spec.special);
@@ -562,7 +561,7 @@
                 y: cy + overlap * 0.03
             });
             Body.setVelocity(cat.body, {
-                x: Math.max(-MAX_CAT_SPEED, Math.min(MAX_CAT_SPEED, cat.body.velocity.x + signX * 1.55 * power)),
+                x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + signX * 1.55 * power)),
                 y: cat.body.velocity.y
             });
             Body.applyForce(cat.body, cat.body.position, {
@@ -600,8 +599,8 @@
         if (cy < CUP_RIM_Y + 120 && nvy < 0) nvy = Math.max(nvy, -0.6);
 
         Body.setVelocity(cat.body, {
-            x: Math.max(-MAX_CAT_SPEED, Math.min(MAX_CAT_SPEED, nvx)),
-            y: Math.max(-1.3, Math.min(MAX_CAT_SPEED, nvy))
+            x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, nvx)),
+            y: Math.max(-1.3, Math.min(CatPhysics.MAX_CAT_SPEED, nvy))
         });
 
         const forceMag = 0.0032 * cat.body.mass * powerScale * (1 + Math.max(overlap, 0) / 5);
@@ -708,7 +707,7 @@
                 y: cat.body.position.y + sepY
             });
             Body.setVelocity(cat.body, {
-                x: Math.max(-MAX_CAT_SPEED, Math.min(MAX_CAT_SPEED, cat.body.velocity.x + signX * 1.45 * power * Math.min(heavy, 1.35) * pileBoost)),
+                x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + signX * 1.45 * power * Math.min(heavy, 1.35) * pileBoost)),
                 y: cat.body.velocity.y
             });
 
@@ -795,22 +794,37 @@
         return createCat(spawnSpec, x, y, isDropped);
     }
 
+    function getSpawnContext() {
+        return {
+            totalDrops: totalDropsThisSession,
+            catsInCup: activeCats.filter(c => c.isDropped && !c.isMouse).length
+        };
+    }
+
     function spawnExcludeFrom(lastSpec) {
-        if (!lastSpec) return null;
+        if (!lastSpec) lastSpec = null;
         return {
             noMouse: GameModes.isMouseSpawn(lastSpec),
-            noGolden: GameModes.isGoldenSpawn(lastSpec)
+            noGolden: GameModes.isGoldenSpawn(lastSpec),
+            spawnContext: getSpawnContext()
         };
+    }
+
+    function ensureSpawnAllowed(spec) {
+        if (GameModes.isMouseSpawn(spec) && !GameModes.canSpawnMouse(getSpawnContext())) {
+            return { level: Math.floor(Math.random() * 4) + 1, special: null };
+        }
+        return spec;
     }
 
     function rollNextSpawn(lastSpec) {
         const exclude = spawnExcludeFrom(lastSpec);
         if (currentGameMode === GameModes.MODES.DAILY) {
-            const spec = GameModes.getNextSpawn(currentGameMode, dailySpawnIndex, null, exclude);
+            const spec = ensureSpawnAllowed(GameModes.getNextSpawn(currentGameMode, dailySpawnIndex, null, exclude));
             dailySpawnIndex++;
             return spec;
         }
-        return GameModes.getNextSpawn(currentGameMode, 0, null, exclude);
+        return ensureSpawnAllowed(GameModes.getNextSpawn(currentGameMode, 0, null, exclude));
     }
 
     function tryTransformGoldenBall(goldenCat, otherCat) {
@@ -883,7 +897,7 @@
     }
 
     function applyCupGravity() {
-        const g = GRAVITY_BASE;
+        const g = CatPhysics.GRAVITY_Y;
         engine.gravity.x = Math.sin(cupTiltAngle) * g;
         engine.gravity.y = Math.cos(cupTiltAngle) * g;
         updateCupBoundaries(cupTiltAngle);
@@ -949,10 +963,10 @@
     }
 
     function triggerWobble(cat, speed) {
-        const force = Math.min(speed / 120.0, 0.028);
-        if (force > 0.018) {
+        const force = Math.min(speed / CatPhysics.WOBBLE_SPEED_DIVISOR, CatPhysics.WOBBLE_MAX_FORCE);
+        if (force > CatPhysics.WOBBLE_MIN_FORCE) {
             cat.wobbleVelocityX = -force;
-            cat.wobbleVelocityY = force * 0.8;
+            cat.wobbleVelocityY = force * 1.2;
         }
     }
 
@@ -1160,6 +1174,7 @@
 
         cat.isDropped = true;
         Body.setStatic(cat.body, false);
+        totalDropsThisSession++;
 
         if (cat.isMouse) {
             cat.isEscaping = true;
@@ -1188,7 +1203,7 @@
     }
 
     function getCatColliderRadius(cat) {
-        return cat.radius * 0.98;
+        return cat.radius * CatPhysics.COLLIDER_RADIUS_SCALE;
     }
 
     function clampCatInCup(cat) {
@@ -1196,8 +1211,8 @@
 
         if (Math.abs(cupTiltAngle) > 0.02) {
             const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
-            if (speed > MAX_CAT_SPEED) {
-                const scale = MAX_CAT_SPEED / speed;
+            if (speed > CatPhysics.MAX_CAT_SPEED) {
+                const scale = CatPhysics.MAX_CAT_SPEED / speed;
                 Body.setVelocity(cat.body, {
                     x: cat.body.velocity.x * scale,
                     y: cat.body.velocity.y * scale
@@ -1226,16 +1241,9 @@
             Body.setVelocity(cat.body, { x: 0, y: cat.body.velocity.y });
         }
 
-        if (!cat.isMouse && pos.y < CUP_RIM_Y + 100 && cat.body.velocity.y < -1.2) {
-            Body.setVelocity(cat.body, {
-                x: cat.body.velocity.x,
-                y: Math.max(-1.2, cat.body.velocity.y)
-            });
-        }
-
         const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
-        if (speed > MAX_CAT_SPEED) {
-            const scale = MAX_CAT_SPEED / speed;
+        if (speed > CatPhysics.MAX_CAT_SPEED) {
+            const scale = CatPhysics.MAX_CAT_SPEED / speed;
             Body.setVelocity(cat.body, {
                 x: cat.body.velocity.x * scale,
                 y: cat.body.velocity.y * scale
@@ -2086,6 +2094,7 @@
     function startGameMode(mode) {
         currentGameMode = mode;
         dailySpawnIndex = 0;
+        totalDropsThisSession = 0;
         cupTiltAngle = 0;
         cupTiltTarget = 0;
         chaosTimer = 0;
@@ -2093,10 +2102,10 @@
         mergeCountSinceTilt = 0;
         applyCupGravity();
         if (mode === GameModes.MODES.DAILY) {
-            nextSpawn = GameModes.getNextSpawn(mode, 0);
+            nextSpawn = ensureSpawnAllowed(GameModes.getNextSpawn(mode, 0));
             dailySpawnIndex = 1;
         } else {
-            nextSpawn = GameModes.getNextSpawn(mode, 0);
+            nextSpawn = ensureSpawnAllowed(GameModes.getNextSpawn(mode, 0));
         }
         updateModeBadge();
     }
@@ -2526,7 +2535,8 @@
         GameState.saveActiveSession(GameState.score, GameState.fish_coins, nextSpawn, getSerializableCats(), {
             game_mode: currentGameMode,
             daily_spawn_index: dailySpawnIndex,
-            cup_tilt: cupTiltAngle
+            cup_tilt: cupTiltAngle,
+            total_drops: totalDropsThisSession
         });
     }
 
@@ -2549,10 +2559,12 @@
             }
             applyCupGravity();
 
+            totalDropsThisSession = data.total_drops || data.cats.length;
+
             if (data.next_spawn) {
-                nextSpawn = data.next_spawn;
+                nextSpawn = ensureSpawnAllowed(data.next_spawn);
             } else if (data.next_cat_level !== undefined) {
-                nextSpawn = { level: data.next_cat_level, special: null };
+                nextSpawn = ensureSpawnAllowed({ level: data.next_cat_level, special: null });
             }
 
             data.cats.forEach(cData => {

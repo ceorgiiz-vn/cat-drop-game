@@ -303,6 +303,7 @@ const GameState = {
             game_mode: extra?.game_mode || "classic",
             daily_spawn_index: extra?.daily_spawn_index || 0,
             cup_tilt: extra?.cup_tilt || 0,
+            total_drops: extra?.total_drops || 0,
             cats: catsData
         };
 

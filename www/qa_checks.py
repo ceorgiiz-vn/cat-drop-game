@@ -76,6 +76,33 @@ def check_sprite_js_preview():
     return ok("sprite.js HUD preview uses responsive canvas size")
 
 
+def check_physics_frozen():
+    path = os.path.join(ROOT, "js", "physics.js")
+    text = open(path, encoding="utf-8").read()
+    required = [
+        "CAT_RESTITUTION: 0.38",
+        "CAT_FRICTION: 0.25",
+        "GRAVITY_Y: 1.45",
+        "DO NOT change",
+    ]
+    for needle in required:
+        if needle not in text:
+            return fail(f"physics.js missing frozen baseline marker: {needle}")
+    game = open(os.path.join(ROOT, "js", "game.js"), encoding="utf-8").read()
+    if "restitution: 0.38" in game and "CatPhysics" not in game:
+        return fail("game.js should use CatPhysics, not inline restitution")
+    return ok("physics.js frozen baseline present")
+
+
+def check_mouse_spawn_gate():
+    text = open(os.path.join(ROOT, "js", "game_modes.js"), encoding="utf-8").read()
+    if "MIN_DROPS_BEFORE_MOUSE" not in text or "canSpawnMouse" not in text:
+        return fail("game_modes.js must gate early mouse spawns")
+    if "MIN_DROPS_BEFORE_MOUSE = 40" not in text:
+        return fail("MIN_DROPS_BEFORE_MOUSE should be 40")
+    return ok("mouse spawn gated until cup has stacked")
+
+
 def check_game_timing():
     path = os.path.join(ROOT, "js", "game.js")
     text = open(path, encoding="utf-8").read()
@@ -110,6 +137,8 @@ def main():
         check_dev_cat_png(),
         check_sprite_corners(),
         check_sprite_js_preview(),
+        check_physics_frozen(),
+        check_mouse_spawn_gate(),
         check_game_timing(),
         check_css_preview_circle(),
     ]

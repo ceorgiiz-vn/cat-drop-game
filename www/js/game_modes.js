@@ -15,6 +15,10 @@ const GameModes = (function() {
     const GOLDEN_CHANCE_CLASSIC = 0.045 / 3;  // ~1.5% — rare surprise
     const GOLDEN_CHANCE_CHAOS = 0.03 / 3;     // ~1%
 
+    /** Mouse only after enough drops and a stacked cup (see canSpawnMouse). */
+    const MIN_DROPS_BEFORE_MOUSE = 40;
+    const MIN_CATS_IN_CUP_BEFORE_MOUSE = 6;
+
     const SPECIAL = {
         STICKY: "sticky",
         SOAPY: "soapy",
@@ -77,9 +81,17 @@ const GameModes = (function() {
         return { level: Math.floor(rng() * 4) + 1, special: null };
     }
 
+    function canSpawnMouse(ctx) {
+        if (!ctx) return false;
+        const drops = ctx.totalDrops | 0;
+        const inCup = ctx.catsInCup | 0;
+        return drops >= MIN_DROPS_BEFORE_MOUSE && inCup >= MIN_CATS_IN_CUP_BEFORE_MOUSE;
+    }
+
     /** Reroll if same rare type would spawn twice in a row (mouse / golden). */
     function rollSpawn(mode, rng, exclude) {
-        const blockMouse = !!(exclude && exclude.noMouse);
+        const ctx = exclude && exclude.spawnContext;
+        const blockMouse = !!(exclude && exclude.noMouse) || (ctx ? !canSpawnMouse(ctx) : true);
         const blockGolden = !!(exclude && exclude.noGolden);
         if (!blockMouse && !blockGolden) {
             return rollSpawnRaw(mode, rng);
@@ -134,6 +146,9 @@ const GameModes = (function() {
         isGoldenSpawn,
         isMouseSpawn,
         isSpecialSpawn,
+        canSpawnMouse,
+        MIN_DROPS_BEFORE_MOUSE,
+        MIN_CATS_IN_CUP_BEFORE_MOUSE,
         modeLabel
     };
 })();
