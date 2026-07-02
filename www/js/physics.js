@@ -1,10 +1,9 @@
 /**
- * Cat Drop — frozen Matter.js physics baseline.
- * Recovered from CatDropEvolution-debug.apk (classic cat stacking feel).
- * DO NOT change these values unless the user explicitly asks to tune physics.
+ * Cat Drop — Matter.js physics tuning.
+ * Baseline from CatDropEvolution-debug.apk; speed 2× per user request (2026-06).
  */
 const CatPhysics = Object.freeze({
-    GRAVITY_Y: 1.45,
+    GRAVITY_Y: 2.9,
     POSITION_ITERATIONS: 10,
     VELOCITY_ITERATIONS: 8,
 
@@ -16,7 +15,7 @@ const CatPhysics = Object.freeze({
     WALL_FRICTION: 0.25,
     WALL_RESTITUTION: 0.18,
 
-    MAX_CAT_SPEED: 14,
+    MAX_CAT_SPEED: 28,
 
     WOBBLE_SPEED_DIVISOR: 90,
     WOBBLE_MAX_FORCE: 0.05,

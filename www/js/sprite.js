@@ -2,7 +2,7 @@
 // Each sprite is 1024x1024 RGBA: cat-in-ball fills the frame, transparent corners.
 
 const CatSprite = (function() {
-    const EDGE_OVERSCALE = 1.12; // in-game: crop PNG halos (Hungry Cats ~1.15)
+    const EDGE_OVERSCALE = 1.16; // fill the ball circle on high-DPI phones
 
     function previewDisplayD(canvas, fallbackDiameter) {
         const rect = canvas.getBoundingClientRect();

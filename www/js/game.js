@@ -135,7 +135,7 @@
     const FLOOR_TOP_Y = 1100;
     const mergingBodyIds = new Set();
     const CHAOS_TILT_RAD = Math.PI / 8; // ~22.5° — proportional cup teeter, not sideways magnet
-    const MOUSE_RADIUS = 22;
+    const MOUSE_RADIUS = 22 * GameState.CAT_SIZE_SCALE;
     /** TEMP: spawn two lvl-11 cats for easter-egg testing — set false before release */
     const DEBUG_ULTIMATE_EGG_TEST = false;
     let debugEggSpawned = false;
@@ -1180,7 +1180,7 @@
             cat.isEscaping = true;
             cat.squeaked = false;
             cat.stuckTime = 0;
-            Body.setVelocity(cat.body, { x: 0, y: 3.5 });
+            Body.setVelocity(cat.body, { x: 0, y: 7.0 });
         }
 
         World.add(engine.world, cat.body);

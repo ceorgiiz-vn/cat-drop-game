@@ -82,8 +82,9 @@ def check_physics_frozen():
     required = [
         "CAT_RESTITUTION: 0.38",
         "CAT_FRICTION: 0.25",
-        "GRAVITY_Y: 1.45",
-        "DO NOT change",
+        "GRAVITY_Y: 2.9",
+        "MAX_CAT_SPEED: 28",
+        "CAT_SIZE_SCALE: 1.5",
     ]
     for needle in required:
         if needle not in text:
@@ -91,6 +92,9 @@ def check_physics_frozen():
     game = open(os.path.join(ROOT, "js", "game.js"), encoding="utf-8").read()
     if "restitution: 0.38" in game and "CatPhysics" not in game:
         return fail("game.js should use CatPhysics, not inline restitution")
+    state = open(os.path.join(ROOT, "js", "state.js"), encoding="utf-8").read()
+    if "CAT_SIZE_SCALE: 1.5" not in state:
+        return fail("state.js CAT_SIZE_SCALE should be 1.5 for readable mobile cats")
     return ok("physics.js frozen baseline present")
 
 
