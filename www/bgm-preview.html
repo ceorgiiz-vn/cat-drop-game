@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cat Drop 2 — BGM Demo</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, sans-serif;
+            background: #111424;
+            color: #f5f0e8;
+            margin: 0;
+            padding: 24px 16px 48px;
+            max-width: 520px;
+            margin-inline: auto;
+        }
+        h1 { font-size: 1.25rem; margin: 0 0 8px; }
+        p { color: #b8b0a6; line-height: 1.5; font-size: 0.95rem; }
+        .card {
+            background: #191d32;
+            border-radius: 14px;
+            padding: 16px;
+            margin: 16px 0;
+            border: 1px solid #2a3050;
+        }
+        audio { width: 100%; margin-top: 10px; }
+        .tag {
+            display: inline-block;
+            background: #2d3558;
+            color: #ffd700;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 999px;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Демо музыки Cat Drop 2</h1>
+    <p>Это та же уютная мелодия (C major, retro chiptune), но с бесшовным лупом — без хрипа на стыке. Послушай и скажи: <strong>она или не она</strong>.</p>
+
+    <div class="card">
+        <span class="tag">Один цикл (~19 сек)</span>
+        <div><strong>bgm_demo.wav</strong> — как будет в игре</div>
+        <audio controls loop src="assets/audio/bgm_demo.wav?v=1"></audio>
+    </div>
+
+    <div class="card">
+        <span class="tag">Тест лупа ×3</span>
+        <div><strong>bgm_demo_loop_test.wav</strong> — три повтора подряд; стыки на ~19 с и ~38 с</div>
+        <audio controls src="assets/audio/bgm_demo_loop_test.wav?v=1"></audio>
+    </div>
+
+    <p>Если мелодия правильная — напиши «да», и я включу её в игре и залью на сайт.</p>
+</body>
+</html>
