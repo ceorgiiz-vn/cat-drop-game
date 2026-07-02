@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cat Drop 2</string>
+    <string name="title_activity_main">Cat Drop 2</string>
+    <string name="package_name">com.catdrop.evolution2</string>
+    <string name="custom_url_scheme">com.catdrop.evolution2</string>
+</resources>

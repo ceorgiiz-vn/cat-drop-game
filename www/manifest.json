@@ -1,0 +1,18 @@
+{
+  "name": "Cat Drop 2",
+  "short_name": "Cat Drop 2",
+  "description": "Drop and merge kawaii cats to reach the ultimate Space Cat!",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111424",
+  "theme_color": "#191d32",
+  "icons": [
+    {
+      "src": "assets/sprites/cat_11.png",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
