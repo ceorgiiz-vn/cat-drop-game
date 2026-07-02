@@ -1,8 +1,7 @@
 // Web Audio engine — seamless BGM loops and clean one-shot SFX
 
 const GameAudio = (function() {
-    /** Procedural BGM disabled — original game used SFX only (meow/drop/merge). */
-    const ENABLE_BGM = false;
+    const ENABLE_BGM = true;
 
     const SETS = {
         Default: { suffix: "", bgm: "bgm.wav" },

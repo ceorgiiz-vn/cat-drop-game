@@ -82,8 +82,11 @@ def check_game_timing():
     audio = open(os.path.join(ROOT, "js", "audio.js"), encoding="utf-8").read()
     if "DEBUG_ULTIMATE_EGG_TEST = true" in text:
         return fail("DEBUG_ULTIMATE_EGG_TEST must be false for release")
-    if "ENABLE_BGM = true" in audio:
-        return fail("procedural BGM should stay disabled (ENABLE_BGM = false)")
+    if "ENABLE_BGM = false" in audio:
+        return fail("BGM should be enabled (ENABLE_BGM = true)")
+    bgm = os.path.join(ROOT, "assets", "audio", "bgm.wav")
+    if os.path.getsize(bgm) > 1_200_000:
+        return fail("bgm.wav looks like wrong (chiptune) version — use original ~1MB")
     if "timer: 2.5" not in text or "total: 2.5" not in text:
         return fail("dev peek duration should be 2.5s")
     if "mouthY" not in text or "mouthX" not in text:
