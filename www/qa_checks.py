@@ -92,8 +92,8 @@ def check_physics_frozen():
     if "restitution: 0.38" in game and "CatPhysics" not in game:
         return fail("game.js should use CatPhysics, not inline restitution")
     state = open(os.path.join(ROOT, "js", "state.js"), encoding="utf-8").read()
-    if "CAT_SIZE_SCALE: 1.5" not in state:
-        return fail("state.js CAT_SIZE_SCALE should be 1.5 for readable mobile cats")
+    if "CAT_SIZE_SCALE: 1.125" not in state:
+        return fail("state.js CAT_SIZE_SCALE should be 1.125 for readable mobile cats")
     return ok("physics.js baseline + cat size scale present")
 
 

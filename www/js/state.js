@@ -42,7 +42,7 @@ const GameState = {
     },
 
     /** Visual + physics scale for all cats (1.0 = original APK sizes). */
-    CAT_SIZE_SCALE: 1.5,
+    CAT_SIZE_SCALE: 1.125,
 
     // Radii of cats (levels 1 to 11)
     get_radius(level) {
