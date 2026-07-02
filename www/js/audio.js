@@ -2,6 +2,7 @@
 
 const GameAudio = (function() {
     const ENABLE_BGM = true;
+    const MUSIC_GAIN = 0.20;
 
     const SETS = {
         Default: { suffix: "", bgm: "bgm.wav" },
@@ -39,7 +40,7 @@ const GameAudio = (function() {
 
             musicBus = ctx.createGain();
             sfxBus = ctx.createGain();
-            musicBus.gain.value = 0.34;
+            musicBus.gain.value = MUSIC_GAIN;
             sfxBus.gain.value = 0.42;
             musicBus.connect(compressor);
             sfxBus.connect(compressor);
@@ -123,7 +124,7 @@ const GameAudio = (function() {
         try { src.stop(t + fadeMs / 1000 + 0.05); } catch (_) {}
         setTimeout(() => {
             try { src.disconnect(); } catch (_) {}
-            if (musicEnabled) musicBus.gain.value = 0.34;
+            if (musicEnabled) musicBus.gain.value = MUSIC_GAIN;
         }, fadeMs + 60);
     }
 

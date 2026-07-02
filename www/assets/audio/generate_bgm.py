@@ -1,7 +1,9 @@
 import math
-import wave
-import struct
 import os
+import struct
+import wave
+
+from clean_wav import finalize_bgm
 
 sample_rate = 44100
 bpm = 100
@@ -32,10 +34,6 @@ def get_note_freq(note_name):
 	return notes.get(note_name, 0.0)
 
 def write_wav(filename, samples):
-	max_val = max(abs(x) for x in samples) if samples else 0.0
-	if max_val > 0.0:
-		samples = [x / max_val * 0.75 for x in samples]
-		
 	with wave.open(filename, 'wb') as wav_file:
 		wav_file.setnchannels(1)
 		wav_file.setsampwidth(2)
@@ -147,7 +145,7 @@ def synth_bgm():
 		samples[i] = samples[i] * weight + samples[num_samples - fade_len + i] * (1.0 - weight)
 	
 	samples = samples[:num_samples - fade_len]
-	return samples
+	return finalize_bgm(samples)
 
 # Create directory and write file
 audio_dir = os.path.dirname(os.path.abspath(__file__))

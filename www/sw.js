@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v61';
+const CACHE_NAME = 'cat-drop-v62';
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',

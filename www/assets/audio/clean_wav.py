@@ -45,17 +45,27 @@ def clean_sfx(samples):
     return samples
 
 
-def clean_bgm_loop(samples):
+def finalize_bgm(samples, peak=0.52):
+    """DC removal + peak limit for BGM that already has a built-in loop crossfade."""
+    if not samples:
+        return samples
+    mean = sum(samples) / len(samples)
+    samples = [s - mean for s in samples]
+    pk = max(abs(s) for s in samples) or 1.0
+    return [s / pk * peak for s in samples]
+
+
+def clean_bgm_loop(samples, crossfade_sec=0.35):
+    """Repair loop seam on raw/extracted BGM (not synth output with built-in crossfade)."""
     if not samples:
         return samples
     mean = sum(samples) / len(samples)
     samples = [s - mean for s in samples]
 
-    # Trim trailing near-silence
     while len(samples) > SAMPLE_RATE and abs(samples[-1]) < 0.001:
         samples.pop()
 
-    cf = int(0.15 * SAMPLE_RATE)
+    cf = int(crossfade_sec * SAMPLE_RATE)
     if cf * 2 < len(samples):
         n = len(samples)
         for i in range(cf):
@@ -65,11 +75,7 @@ def clean_bgm_loop(samples):
             samples[i] = samples[i] * fade_in + samples[n - cf + i] * fade_out
         samples = samples[: n - cf]
 
-    fade = int(0.008 * SAMPLE_RATE)
-    for i in range(min(fade, len(samples))):
-        w = i / fade
-        samples[i] *= w
-    return samples
+    return finalize_bgm(samples)
 
 
 def clean_file(path):
