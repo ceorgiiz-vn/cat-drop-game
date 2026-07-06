@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v72';
+const CACHE_NAME = 'cat-drop-v75';
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',
@@ -35,7 +35,7 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
             return cache.addAll(ASSETS_TO_CACHE);
-        })
+        }).then(() => self.skipWaiting())
     );
 });
 
@@ -49,13 +49,28 @@ self.addEventListener('activate', event => {
                     }
                 })
             );
-        })
+        }).then(() => self.clients.claim())
     );
 });
 
 self.addEventListener('fetch', event => {
     // We only want to cache GET requests
     if (event.request.method !== 'GET') return;
+
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request).then(networkResponse => {
+                const responseToCache = networkResponse.clone();
+                caches.open(CACHE_NAME).then(cache => {
+                    cache.put('./index.html', responseToCache);
+                });
+                return networkResponse;
+            }).catch(() => {
+                return caches.match('./index.html').then(cachedResponse => cachedResponse || caches.match('./'));
+            })
+        );
+        return;
+    }
 
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {

@@ -1,9 +1,10 @@
-"""Self-QA checks for known bug areas. Run after changes: python www/qa_checks.py"""
+"""Self-QA checks for known bug areas. Run after changes: python scripts/qa_checks.py"""
 import os
 import sys
 import numpy as np
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.join(REPO_ROOT, "www")
 ASSETS = os.path.join(ROOT, "assets")
 SPRITES = os.path.join(ASSETS, "sprites")
 
@@ -81,9 +82,10 @@ def check_physics_frozen():
     text = open(path, encoding="utf-8").read()
     required = [
         "CAT_RESTITUTION: 0.38",
-        "CAT_FRICTION: 0.25",
-        "GRAVITY_Y: 2.9",
-        "MAX_CAT_SPEED: 28",
+        "CAT_FRICTION: 0.15",
+        "GRAVITY_Y: 2.465",
+        "MAX_CAT_SPEED: 23.8",
+        "COLLIDER_RADIUS_SCALE: 1.0",
     ]
     for needle in required:
         if needle not in text:
@@ -127,11 +129,35 @@ def check_game_timing():
 def check_css_preview_circle():
     path = os.path.join(ROOT, "style.css")
     text = open(path, encoding="utf-8").read()
+    html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
     if "hud-top-bar" not in text:
         return fail("style.css: missing unified hud-top-bar")
-    if "hud-center" not in text or "evolution-scroll" not in text:
-        return fail("style.css: HUD needs grid; evolution needs evolution-scroll")
+    if "hud-center" not in text or "modal-content-scroll" not in html or "evolution-grid" not in text:
+        return fail("style.css/index.html: HUD needs center cell and scrollable evolution grid")
     return ok("CSS top HUD bar + circular next preview")
+
+
+def check_release_payload_clean():
+    forbidden_names = {
+        "__pycache__",
+        "bgm-preview.html",
+        "preview_qa.py",
+        "bgm_demo_original.wav",
+        "bgm_demo_original_loop_test.wav",
+        "original_bgm.wav",
+        "cat_12_preview.png",
+        "skin_oldman_preview.png",
+    }
+    forbidden_suffixes = (".py", ".pyc", ".jpg")
+    offenders = []
+    for base, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d != ".git"]
+        for name in dirs + files:
+            if name in forbidden_names or name.lower().endswith(forbidden_suffixes):
+                offenders.append(os.path.relpath(os.path.join(base, name), ROOT))
+    if offenders:
+        return fail("release payload contains dev/source files: " + ", ".join(sorted(offenders)[:8]))
+    return ok("release payload has no dev/source artifacts in www")
 
 
 def main():
@@ -144,6 +170,7 @@ def main():
         check_mouse_spawn_gate(),
         check_game_timing(),
         check_css_preview_circle(),
+        check_release_payload_clean(),
     ]
     print("---")
     if all(results):

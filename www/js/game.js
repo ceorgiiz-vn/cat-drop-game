@@ -366,13 +366,8 @@
             });
         });
 
-        // Note: continuous mouse/cat separation is handled once per frame by
-        // applyMouseScatterField() in updateMice(), not here — that used to also run
-        // on every 'collisionActive' substep with a different formula on the same
-        // bodies in the same frame, and two independent systems hard-teleporting the
-        // same cat back and forth is what caused the mouse to visibly "tremble" when
-        // wedged instead of scattering the pile. collisionStart's one-shot impact bump
-        // (above) is kept only for the initial "Squeak!" contact.
+        // Mouse/cat separation is handled once per frame by applyMouseGhostPlow().
+        // collisionStart only adds the first squeak and a tiny impact cue.
     }
 
     function normalizeSpawn(spec) {
@@ -471,7 +466,6 @@
             isMerged: false,
             isEscaping: isDropped,
             scurryPhase: Math.random() * Math.PI * 2,
-            stuckTime: 0,
             ghostBaseX: x,
             ghostElapsed: 0,
             squeaked: false,
@@ -491,14 +485,6 @@
         return mouse.radius * 0.64;
     }
 
-    function getMousePushPower(mouse) {
-        const stuck = mouse.stuckTime || 0;
-        if (stuck < 0.05) return 1.2;
-        // Ramps up the longer the mouse is wedged, so a tightly packed pile
-        // eventually gets muscled apart instead of holding the mouse forever.
-        return 1.2 + Math.min((stuck - 0.05) * 3.2, 9.5);
-    }
-
     function getCatHeavyBoost(cat) {
         if (cat.level >= 8) return 1.55;
         if (cat.level >= 6) return 1.42;
@@ -507,59 +493,14 @@
         return 1;
     }
 
-    /** Mouse sitting on / wedged into the crown of a ball below */
-    function isCrownBlock(mouse, cat) {
-        const mx = mouse.body.position.x;
-        const my = mouse.body.position.y;
-        const cx = cat.body.position.x;
-        const cy = cat.body.position.y;
-        const dx = cx - mx;
-        const dy = cy - my;
-        const mouseR = getMouseColliderRadius(mouse);
-        const catR = getCatColliderRadius(cat);
-        return dy > -catR * 0.15 && dy < mouseR + catR * 0.92 && Math.abs(dx) < catR * 0.95;
-    }
-
-    /** Nudge mouse sideways toward the side with more clearance */
-    function steerMouseAroundBlocks(mouse) {
-        if ((mouse.stuckTime || 0) < 0.04) return;
-
-        const mx = mouse.body.position.x;
-        const my = mouse.body.position.y;
-        let leftWeight = 0;
-        let rightWeight = 0;
-
-        activeCats.forEach(cat => {
-            if (cat.isMouse || !cat.isDropped || cat.isGoldenBall) return;
-            if (!isCrownBlock(mouse, cat)) return;
-            const dx = cat.body.position.x - mx;
-            const w = cat.radius * (1 + cat.level * 0.04);
-            if (dx <= 0) leftWeight += w;
-            else rightWeight += w;
-        });
-
-        if (leftWeight === 0 && rightWeight === 0) return;
-
-        const dir = leftWeight <= rightWeight ? 1 : -1;
-        const power = getMousePushPower(mouse);
-        Body.applyForce(mouse.body, mouse.body.position, {
-            x: dir * 0.0055 * mouse.body.mass * power,
-            y: 0
-        });
-    }
-
     /**
-     * One-shot impact nudge on first contact (called from collisionStart only).
-     * Now that the mouse carries real weight (see createMouse's density), Matter's own
-     * collision response already imparts genuine momentum to whatever it hits — this
-     * just adds a small extra kick + the "Squeak!" cue. Deliberately NOT repeated every
-     * frame and NOT a position teleport, so it can never fight the solver / cause jitter.
+     * One-shot impact cue on first sensor contact. The real continuous separation is
+     * applyMouseGhostPlow(); this only makes the first touch feel alive.
      */
     function applyMousePush(mouse, cat, isImpact) {
         if (!mouse.isMouse || !mouse.isDropped || !cat.isDropped || cat.isMouse || cat.isGoldenBall) return;
         if (!isImpact) return;
 
-        const power = getMousePushPower(mouse);
         const mx = mouse.body.position.x;
         const my = mouse.body.position.y;
         const cx = cat.body.position.x;
@@ -570,7 +511,7 @@
         const nx = dx / dist;
         const ny = dy / dist;
 
-        const kick = 1.4 * power;
+        const kick = 1.6;
         Body.setVelocity(cat.body, {
             x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + nx * kick)),
             y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, ny) * kick * 0.6))
@@ -581,55 +522,6 @@
             playMergeSound(1.45);
             spawnFloatingText(mx, my - 20, "Squeak!", "#f48fb1");
         }
-    }
-
-    /**
-     * Continuous outward push field while the mouse is stuck. Pure forces only (no
-     * position teleporting) so it blends into Matter's own solver instead of fighting
-     * it frame-to-frame — that fight (multiple systems hard-repositioning the same
-     * bodies) is what used to look like "shaking" instead of a clean scatter. Combined
-     * with the mouse's real weight, this is now enough to actually fling cats apart
-     * rather than just vibrate against them.
-     */
-    function applyMouseScatterField(mouse) {
-        const stuck = mouse.stuckTime || 0;
-        if (stuck < 0.05) return;
-
-        const mx = mouse.body.position.x;
-        const my = mouse.body.position.y;
-        const power = getMousePushPower(mouse);
-        const mouseR = getMouseColliderRadius(mouse);
-
-        activeCats.forEach(cat => {
-            if (cat.isMouse || !cat.isDropped || cat.isGoldenBall) return;
-
-            const dx = cat.body.position.x - mx;
-            const dy = cat.body.position.y - my;
-            const dist = Math.hypot(dx, dy) || 0.01;
-            const reach = mouseR + cat.radius + 16;
-            if (dist > reach) return;
-
-            const overlap = reach - dist;
-            if (overlap <= 0.15) return; // ignore hairline overlaps — avoids visible micro-jitter at rest
-
-            const nx = dx / dist;
-            const ny = dy / dist;
-            const heavy = getCatHeavyBoost(cat);
-
-            // Radial force away from the mouse, scaled by overlap depth and accumulated
-            // stuck power. Proportional to the cat's own mass so the resulting
-            // acceleration (how "hard" the scatter looks) stays consistent across sizes.
-            const forceMag = 0.0075 * cat.body.mass * power * Math.min(heavy, 1.5) * (overlap / reach + 0.4);
-            Body.applyForce(cat.body, cat.body.position, {
-                x: nx * forceMag,
-                y: ny * forceMag * (ny < 0 ? 0.35 : 0.85)
-            });
-        });
-
-        // The mouse itself wiggles/pushes back a bit harder the longer it's stuck,
-        // helping it work its way into the opening its own force field creates.
-        const wiggle = Math.sin(mouse.scurryPhase * 2.1) * 0.006 * mouse.body.mass * power;
-        Body.applyForce(mouse.body, mouse.body.position, { x: wiggle, y: 0 });
     }
 
     function applyMouseGhostPlow(mouse) {
@@ -672,51 +564,6 @@
             Body.setAngularVelocity(cat.body, cat.body.angularVelocity + side * (0.035 + strength * 0.08));
             triggerWobble(cat, 4 + strength * 8);
         });
-    }
-
-    const MOUSE_FAILSAFE_STUCK_TIME = 4.2; // seconds fully wedged before we guarantee an opening
-
-    /**
-     * Last-resort escape valve: if the mouse has been wedged in a fully-packed pile
-     * longer than MOUSE_FAILSAFE_STUCK_TIME even at max push power (should be rare —
-     * getMousePushPower() ramps to full strength well before this), directly relocate
-     * whichever neighboring cat overlaps it the most to a clear spot beside it. This
-     * guarantees the mouse can never truly soft-lock the cup.
-     */
-    function forceClearMousePath(mouse) {
-        const mx = mouse.body.position.x;
-        const my = mouse.body.position.y;
-        const mouseR = getMouseColliderRadius(mouse);
-
-        let worstCat = null;
-        let worstOverlap = 0;
-        activeCats.forEach(cat => {
-            if (cat.isMouse || !cat.isDropped || cat.isGoldenBall) return;
-            const dx = cat.body.position.x - mx;
-            const dy = cat.body.position.y - my;
-            const dist = Math.hypot(dx, dy) || 0.01;
-            const overlap = (mouseR + getCatColliderRadius(cat)) - dist;
-            if (overlap > worstOverlap) {
-                worstOverlap = overlap;
-                worstCat = cat;
-            }
-        });
-
-        if (!worstCat) {
-            mouse.stuckTime = 0;
-            return;
-        }
-
-        const catR = getCatColliderRadius(worstCat);
-        const dx = worstCat.body.position.x - mx;
-        const signX = dx >= 0 ? 1 : -1;
-        const targetX = getClampedX(mx + signX * (mouseR + catR + 10), catR);
-
-        Body.setPosition(worstCat.body, { x: targetX, y: worstCat.body.position.y });
-        Body.setVelocity(worstCat.body, { x: signX * 5, y: worstCat.body.velocity.y * 0.5 });
-        triggerWobble(worstCat, 6);
-
-        mouse.stuckTime = 0;
     }
 
     function getMouseFaceAngle(mouse) {
@@ -1168,7 +1015,6 @@
         if (cat.isMouse) {
             cat.isEscaping = true;
             cat.squeaked = false;
-            cat.stuckTime = 0;
             cat.ghostBaseX = cat.body.position.x;
             cat.ghostElapsed = 0;
             Body.setVelocity(cat.body, { x: 0, y: MOUSE_GHOST_FALL_SPEED / 60 });

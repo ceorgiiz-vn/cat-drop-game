@@ -19,27 +19,6 @@ const GameState = {
     sfx_enabled: true,
     music_enabled: true,
     google_sheets_url: "",
-    
-    // Tamagotchi State
-    tamagotchi: {
-        hunger: 100,
-        happiness: 100,
-        energy: 100,
-        last_update: Date.now(),
-        created_at: Date.now(),
-        items: {
-            bowl: 0,         // 0: none, 1: basic, 2: premium
-            bed: 0,          // 0: none, 1: cardboard box, 2: fluffy bed
-            toy: 0,          // 0: none, 1: yarn ball, 2: mouse toy
-            scratcher: 0,    // 0: none, 1: small post, 2: cat tree
-            hat: 0,          // 0: none, 1: top hat
-            glasses: 0       // 0: none, 1: sunglasses
-        },
-        equipped: {
-            hat: null,
-            glasses: null
-        }
-    },
 
     /** Visual + physics scale for all cats (1.0 = original APK sizes). */
     CAT_SIZE_SCALE: 1.125,
@@ -104,20 +83,6 @@ const GameState = {
                 this.active_sound_set = data.active_sound_set ?? "Default";
                 this.sfx_enabled = data.sfx_enabled ?? true;
                 this.music_enabled = data.music_enabled ?? true;
-                
-                if (data.tamagotchi) {
-                    this.tamagotchi = data.tamagotchi;
-                }
-                // Ensure default values exist if updating from older version
-                if (!this.tamagotchi.items) {
-                    this.tamagotchi.items = { bowl: 0, bed: 0, toy: 0, scratcher: 0, hat: 0, glasses: 0 };
-                }
-                if (!this.tamagotchi.equipped) {
-                    this.tamagotchi.equipped = { hat: null, glasses: null };
-                }
-                if (!this.tamagotchi.created_at) {
-                    this.tamagotchi.created_at = Date.now();
-                }
             } catch (e) {
                 console.error("Error parsing save data, using defaults", e);
             }
@@ -141,8 +106,7 @@ const GameState = {
             purchased_sounds: this.purchased_sounds,
             active_sound_set: this.active_sound_set,
             sfx_enabled: this.sfx_enabled,
-            music_enabled: this.music_enabled,
-            tamagotchi: this.tamagotchi
+            music_enabled: this.music_enabled
         };
         localStorage.setItem("cat_drop_save_data", JSON.stringify(data));
     },
@@ -207,31 +171,6 @@ const GameState = {
             return true;
         }
         return false;
-    },
-
-    updateTamagotchiStats(hungerDelta, happinessDelta, energyDelta) {
-        this.tamagotchi.hunger = Math.max(0, Math.min(100, this.tamagotchi.hunger + hungerDelta));
-        this.tamagotchi.happiness = Math.max(0, Math.min(100, this.tamagotchi.happiness + happinessDelta));
-        this.tamagotchi.energy = Math.max(0, Math.min(100, this.tamagotchi.energy + energyDelta));
-        this.tamagotchi.last_update = Date.now();
-        this.save();
-    },
-    
-    buyTamagotchiItem(type, level, cost) {
-        if (this.spendFishCoins(cost)) {
-            this.tamagotchi.items[type] = level;
-            // Auto equip if accessory
-            if (type === 'hat') this.tamagotchi.equipped.hat = level;
-            if (type === 'glasses') this.tamagotchi.equipped.glasses = level;
-            this.save();
-            return true;
-        }
-        return false;
-    },
-
-    equipTamagotchiAccessory(type, level) {
-        this.tamagotchi.equipped[type] = level;
-        this.save();
     },
 
     unlockTheme(themeName) {
