@@ -136,10 +136,11 @@
     const mergingBodyIds = new Set();
     const CHAOS_TILT_RAD = Math.PI / 8; // ~22.5° — proportional cup teeter, not sideways magnet
     const MOUSE_RADIUS = 22 * GameState.CAT_SIZE_SCALE;
-    const MOUSE_GHOST_FALL_SPEED = 560;
-    const MOUSE_GHOST_SWAY_AMPLITUDE = 26;
-    const MOUSE_GHOST_SWAY_SPEED = 7.5;
-    const MOUSE_PLOW_RADIUS = MOUSE_RADIUS * 1.75;
+    const MOUSE_STUCK_SPEED = 0.42;
+    const MOUSE_PHASE_AFTER = 0.45;
+    const MOUSE_PHASE_DURATION = 0.42;
+    const MOUSE_PHASE_FALL_SPEED = 250;
+    const MOUSE_PHASE_CLEAR_RADIUS = MOUSE_RADIUS * 1.12;
     /** TEMP: spawn two lvl-11 cats for easter-egg testing — set false before release */
     const DEBUG_ULTIMATE_EGG_TEST = false;
     let debugEggSpawned = false;
@@ -366,7 +367,8 @@
             });
         });
 
-        // Mouse/cat separation is handled once per frame by applyMouseGhostPlow().
+        // Mouse/cat separation is handled once per frame by applyMousePhaseClearance()
+        // only while the mouse briefly phases out of a real stuck state.
         // collisionStart only adds the first squeak and a tiny impact cue.
     }
 
@@ -448,7 +450,7 @@
             restitution: 0.22,
             frictionAir: 0.0025,
             density: 0.05,
-            isSensor: true,
+            isSensor: false,
             isStatic: !isDropped,
             label: "mouse",
             sleepThreshold: Infinity
@@ -466,8 +468,9 @@
             isMerged: false,
             isEscaping: isDropped,
             scurryPhase: Math.random() * Math.PI * 2,
-            ghostBaseX: x,
-            ghostElapsed: 0,
+            stuckTime: 0,
+            phaseTimer: 0,
+            isPhasing: false,
             squeaked: false,
             deathZoneTime: 0,
             spawnScale: isDropped ? 1.0 : 0.0,
@@ -485,6 +488,14 @@
         return mouse.radius * 0.64;
     }
 
+    function resetMouseEscapeState(mouse, escaping) {
+        mouse.isEscaping = escaping;
+        mouse.stuckTime = 0;
+        mouse.phaseTimer = 0;
+        mouse.isPhasing = false;
+        mouse.body.isSensor = false;
+    }
+
     function getCatHeavyBoost(cat) {
         if (cat.level >= 8) return 1.55;
         if (cat.level >= 6) return 1.42;
@@ -494,8 +505,8 @@
     }
 
     /**
-     * One-shot impact cue on first sensor contact. The real continuous separation is
-     * applyMouseGhostPlow(); this only makes the first touch feel alive.
+     * One-shot impact cue on first contact. The real anti-stuck separation is
+     * applyMousePhaseClearance(); this only makes the first touch feel alive.
      */
     function applyMousePush(mouse, cat, isImpact) {
         if (!mouse.isMouse || !mouse.isDropped || !cat.isDropped || cat.isMouse || cat.isGoldenBall) return;
@@ -524,10 +535,10 @@
         }
     }
 
-    function applyMouseGhostPlow(mouse) {
+    function applyMousePhaseClearance(mouse) {
         const mx = mouse.body.position.x;
         const my = mouse.body.position.y;
-        const plowR = MOUSE_PLOW_RADIUS;
+        const phaseR = MOUSE_PHASE_CLEAR_RADIUS;
 
         activeCats.forEach(cat => {
             if (cat.isMouse || !cat.isDropped || cat.isMerged) return;
@@ -536,33 +547,33 @@
             const dy = cat.body.position.y - my;
             const dist = Math.hypot(dx, dy) || 0.01;
             const catR = getCatColliderRadius(cat);
-            const reach = plowR + catR;
+            const reach = phaseR + catR;
             if (dist > reach) return;
 
             const overlap = reach - dist;
             if (overlap <= 0.15) return;
 
-            const strength = Math.min(1, overlap / Math.max(1, reach * 0.45));
+            const strength = Math.min(1, overlap / Math.max(1, reach * 0.5));
             const heavy = getCatHeavyBoost(cat);
-            let side = Math.abs(dx) > 6 ? Math.sign(dx) : Math.sign(Math.sin(mouse.scurryPhase) || 1);
+            let side = Math.abs(dx) > 3 ? Math.sign(dx) : (mx < (LEFT_LIMIT + RIGHT_LIMIT) / 2 ? 1 : -1);
             const sideRoom = side > 0
                 ? RIGHT_LIMIT - cat.radius - cat.body.position.x
                 : cat.body.position.x - (LEFT_LIMIT + cat.radius);
-            if (sideRoom < 10) side *= -1;
+            if (sideRoom < 8) side *= -1;
 
-            const correction = Math.min(9, (1.4 + overlap * 0.13) * heavy);
-            const yNudge = dy < -catR * 0.25 ? -correction * 0.18 : Math.min(2.2, correction * 0.14);
+            const correction = Math.min(2.4, (0.45 + overlap * 0.045) * Math.min(heavy, 1.25));
+            const yNudge = dy < -catR * 0.25 ? -correction * 0.08 : Math.min(0.7, correction * 0.08);
             const targetX = getClampedX(cat.body.position.x + side * correction, cat.radius);
             const targetY = Math.min(FLOOR_TOP_Y - catR, cat.body.position.y + yNudge);
             Body.setPosition(cat.body, { x: targetX, y: targetY });
 
-            const impulse = (1.6 + strength * 5.2) * Math.min(heavy, 1.65);
+            const impulse = (0.45 + strength * 1.15) * Math.min(heavy, 1.25);
             Body.setVelocity(cat.body, {
                 x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + side * impulse)),
-                y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, dy / dist) * impulse * 0.12))
+                y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, dy / dist) * impulse * 0.04))
             });
-            Body.setAngularVelocity(cat.body, cat.body.angularVelocity + side * (0.035 + strength * 0.08));
-            triggerWobble(cat, 4 + strength * 8);
+            Body.setAngularVelocity(cat.body, cat.body.angularVelocity + side * (0.012 + strength * 0.025));
+            if (strength > 0.55) triggerWobble(cat, 2.5 + strength * 3);
         });
     }
 
@@ -577,23 +588,54 @@
     function updateMice(delta) {
         activeCats.filter(c => c.isMouse && c.isDropped && c.isEscaping).forEach(mouse => {
             const dt = Math.min(delta, 0.05);
-            mouse.ghostElapsed += dt;
             mouse.scurryPhase += dt * 14;
-
-            const prevX = mouse.body.position.x;
-            const prevY = mouse.body.position.y;
-            const sway = Math.sin(mouse.ghostElapsed * MOUSE_GHOST_SWAY_SPEED + mouse.scurryPhase * 0.35) * MOUSE_GHOST_SWAY_AMPLITUDE;
-            const x = getClampedX(mouse.ghostBaseX + sway, mouse.radius);
-            const y = prevY + MOUSE_GHOST_FALL_SPEED * dt;
-
-            Body.setPosition(mouse.body, { x, y });
-            Body.setVelocity(mouse.body, { x: x - prevX, y: y - prevY });
-            Body.setAngularVelocity(mouse.body, Math.sin(mouse.scurryPhase) * 0.08);
-
-            applyMouseGhostPlow(mouse);
 
             const r = getMouseColliderRadius(mouse);
             const floorY = FLOOR_TOP_Y - r;
+
+            if (mouse.isPhasing) {
+                mouse.phaseTimer -= dt;
+
+                const prevX = mouse.body.position.x;
+                const prevY = mouse.body.position.y;
+                const x = getClampedX(prevX + Math.sin(mouse.scurryPhase * 0.6) * 0.55, mouse.radius);
+                const y = Math.min(floorY, prevY + MOUSE_PHASE_FALL_SPEED * dt);
+
+                Body.setPosition(mouse.body, { x, y });
+                Body.setVelocity(mouse.body, { x: x - prevX, y: Math.max(1.8, y - prevY) });
+                Body.setAngularVelocity(mouse.body, Math.sin(mouse.scurryPhase) * 0.045);
+                applyMousePhaseClearance(mouse);
+
+                if (mouse.phaseTimer <= 0 || y >= floorY - 1) {
+                    mouse.isPhasing = false;
+                    mouse.phaseTimer = 0;
+                    mouse.stuckTime = 0;
+                    mouse.body.isSensor = false;
+                }
+            } else {
+                const wiggle = Math.sin(mouse.scurryPhase) * 0.0012 * mouse.body.mass;
+                Body.applyForce(mouse.body, mouse.body.position, { x: wiggle, y: 0 });
+
+                const speed = Math.hypot(mouse.body.velocity.x, mouse.body.velocity.y);
+                if (speed < MOUSE_STUCK_SPEED && mouse.body.position.y < floorY - 4) {
+                    mouse.stuckTime += dt;
+                } else {
+                    mouse.stuckTime = Math.max(0, mouse.stuckTime - dt * 1.8);
+                }
+
+                if (mouse.stuckTime >= MOUSE_PHASE_AFTER) {
+                    mouse.isPhasing = true;
+                    mouse.phaseTimer = MOUSE_PHASE_DURATION;
+                    mouse.body.isSensor = true;
+                    Body.setVelocity(mouse.body, {
+                        x: mouse.body.velocity.x * 0.25,
+                        y: Math.max(2.2, mouse.body.velocity.y)
+                    });
+                }
+            }
+
+            clampCatInCup(mouse);
+
             if (mouse.body.position.y >= floorY - 1) {
                 poofRemoveMouse(mouse);
             }
@@ -918,7 +960,7 @@
             Body.setAngularVelocity(cat.body, cData.angularVelocity);
             cat.deathZoneTime = 0;
             if (cat.isMouse) {
-                cat.isEscaping = false;
+                resetMouseEscapeState(cat, false);
                 cat.isRemoved = false;
                 cat.spawnScale = 1.0;
             }
@@ -1013,11 +1055,9 @@
         totalDropsThisSession++;
 
         if (cat.isMouse) {
-            cat.isEscaping = true;
+            resetMouseEscapeState(cat, true);
             cat.squeaked = false;
-            cat.ghostBaseX = cat.body.position.x;
-            cat.ghostElapsed = 0;
-            Body.setVelocity(cat.body, { x: 0, y: MOUSE_GHOST_FALL_SPEED / 60 });
+            Body.setVelocity(cat.body, { x: 0, y: 7.0 });
         }
 
         World.add(engine.world, cat.body);
@@ -2422,7 +2462,7 @@
                 Body.setAngularVelocity(cat.body, cData.ang_vel);
 
                 if (cat.isMouse) {
-                    cat.isEscaping = true;
+                    resetMouseEscapeState(cat, true);
                     cat.spawnScale = 1.0;
                 }
 
