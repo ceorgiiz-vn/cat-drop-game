@@ -5,10 +5,14 @@ const CatSprite = (function() {
     const EDGE_OVERSCALE = 1.16; // fill the ball circle on high-DPI phones
 
     function previewDisplayD(canvas, fallbackDiameter) {
-        const rect = canvas.getBoundingClientRect();
-        if (rect.width > 1 && rect.height > 1) {
-            return Math.min(rect.width, rect.height);
-        }
+        // Deliberately NOT measured via canvas.getBoundingClientRect(): every preview's
+        // CSS size is already defined as `fallbackDiameter * gs` (see .next-preview-img,
+        // .evolution-img), so computing it the same way here is just as accurate and,
+        // unlike a live DOM measurement, isn't fooled by an ancestor still mid-way
+        // through a CSS transform animation (e.g. a modal opening with transform:
+        // scale(0.3) -> scale(1)) — measuring during that animation used to render the
+        // canvas at a fraction of its real resolution, which then got stretched back up
+        // and looked blurry once the modal finished opening.
         const gs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gs")) || 1;
         return fallbackDiameter * gs;
     }

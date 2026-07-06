@@ -150,6 +150,14 @@
     const CUP_FLOOR_Y = 1110;
     const CUP_PIVOT_X = 360;
     const CUP_PIVOT_Y = 1060; // pivot near cup base — cats roll to lower corner, not the side wall
+    // Walls end exactly where the floor begins (both at FLOOR_TOP_Y) with zero overlap —
+    // two static rectangles meeting at a perfectly coincident edge/corner is a classic
+    // 2D-physics degenerate case: a ball rolling into that exact seam gets an ambiguous
+    // contact normal (wall face vs floor face), which shows up as spinning in place,
+    // sticking, or occasionally tunnelling through right at the corner. Extending the
+    // walls a bit past the floor's top surface turns that hairline seam into solid
+    // overlapping geometry, so there's no ambiguous point left to catch on.
+    const WALL_FLOOR_OVERLAP = 26;
 
     function rotatePoint(px, py, angle) {
         const dx = px - CUP_PIVOT_X;
@@ -175,7 +183,7 @@
 
     function updateCupBoundaries(angle) {
         if (!cupLeftWall || !cupRightWall || !cupFloor) return;
-        const wallHeight = FLOOR_TOP_Y - CUP_PHYSICS_TOP_Y;
+        const wallHeight = FLOOR_TOP_Y - CUP_PHYSICS_TOP_Y + WALL_FLOOR_OVERLAP;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
 
         const leftPos = rotatePoint(CUP_WALL_LEFT_X, wallCenterY, angle);
@@ -239,7 +247,7 @@
 
         // Rigid boundaries — inner faces at x=80 / x=640; walls extend above visual rim so
         // dropped cats slide in without bouncing off the top corner at y=CUP_RIM_Y.
-        const wallHeight = FLOOR_TOP_Y - CUP_PHYSICS_TOP_Y;
+        const wallHeight = FLOOR_TOP_Y - CUP_PHYSICS_TOP_Y + WALL_FLOOR_OVERLAP;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
         cupLeftWall = Bodies.rectangle(CUP_WALL_LEFT_X, wallCenterY, 20, wallHeight, { 
             isStatic: true, 
@@ -354,14 +362,13 @@
             });
         });
 
-        Events.on(engine, 'collisionActive', (event) => {
-            event.pairs.forEach((pair) => {
-                const a = pair.bodyA.gameObject;
-                const b = pair.bodyB.gameObject;
-                if (a?.isMouse && b?.isDropped && !b.isMouse && !b.isGoldenBall) applyMousePush(a, b, false);
-                if (b?.isMouse && a?.isDropped && !a.isMouse && !a.isGoldenBall) applyMousePush(b, a, false);
-            });
-        });
+        // Note: continuous mouse/cat separation is handled once per frame by
+        // applyMouseScatterField() in updateMice(), not here — that used to also run
+        // on every 'collisionActive' substep with a different formula on the same
+        // bodies in the same frame, and two independent systems hard-teleporting the
+        // same cat back and forth is what caused the mouse to visibly "tremble" when
+        // wedged instead of scattering the pile. collisionStart's one-shot impact bump
+        // (above) is kept only for the initial "Squeak!" contact.
     }
 
     function normalizeSpawn(spec) {
@@ -439,9 +446,9 @@
         const colliderR = radius * 0.64;
         const body = Bodies.circle(x, y, colliderR, {
             friction: 0.018,
-            restitution: 0.03,
+            restitution: 0.22,
             frictionAir: 0.0025,
-            density: 0.00195,
+            density: 0.05, // heavy on purpose — real mass advantage over most cats so it can genuinely scatter a jam, not just nudge it
             isStatic: !isDropped,
             label: "mouse",
             sleepThreshold: Infinity
@@ -480,7 +487,9 @@
     function getMousePushPower(mouse) {
         const stuck = mouse.stuckTime || 0;
         if (stuck < 0.05) return 1.2;
-        return 1.2 + Math.min((stuck - 0.05) * 3.4, 4.8);
+        // Ramps up the longer the mouse is wedged, so a tightly packed pile
+        // eventually gets muscled apart instead of holding the mouse forever.
+        return 1.2 + Math.min((stuck - 0.05) * 3.2, 9.5);
     }
 
     function getCatHeavyBoost(cat) {
@@ -532,8 +541,16 @@
         });
     }
 
+    /**
+     * One-shot impact nudge on first contact (called from collisionStart only).
+     * Now that the mouse carries real weight (see createMouse's density), Matter's own
+     * collision response already imparts genuine momentum to whatever it hits — this
+     * just adds a small extra kick + the "Squeak!" cue. Deliberately NOT repeated every
+     * frame and NOT a position teleport, so it can never fight the solver / cause jitter.
+     */
     function applyMousePush(mouse, cat, isImpact) {
         if (!mouse.isMouse || !mouse.isDropped || !cat.isDropped || cat.isMouse || cat.isGoldenBall) return;
+        if (!isImpact) return;
 
         const power = getMousePushPower(mouse);
         const mx = mouse.body.position.x;
@@ -543,144 +560,38 @@
         const dx = cx - mx;
         const dy = cy - my;
         const dist = Math.hypot(dx, dy) || 0.01;
-        const minDist = getMouseColliderRadius(mouse) + getCatColliderRadius(cat);
-        const overlap = minDist - dist;
-        if (overlap <= 0.02) return;
-
         const nx = dx / dist;
         const ny = dy / dist;
 
-        const heavy = getCatHeavyBoost(cat);
-        const powerScale = power * Math.min(heavy, 1.45);
-
-        if (isCrownBlock(mouse, cat)) {
-            const signX = dx >= 0 ? 1 : -1;
-            const sepX = overlap * (isImpact ? 0.78 : 0.62) * powerScale;
-            Body.setPosition(cat.body, {
-                x: cx + signX * sepX,
-                y: cy + overlap * 0.03
-            });
-            Body.setVelocity(cat.body, {
-                x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + signX * 1.55 * power)),
-                y: cat.body.velocity.y
-            });
-            Body.applyForce(cat.body, cat.body.position, {
-                x: signX * 0.0045 * cat.body.mass * powerScale,
-                y: 0
-            });
-            Body.setPosition(mouse.body, {
-                x: mx - signX * overlap * 0.12,
-                y: my
-            });
-            if (isImpact && !mouse.squeaked) {
-                mouse.squeaked = true;
-                playMergeSound(1.45);
-                spawnFloatingText(mx, my - 20, "Squeak!", "#f48fb1");
-            }
-            return;
-        }
-
-        const sep = overlap * (isImpact ? 0.82 : 0.52) * powerScale;
-        let sx = nx * sep;
-        let sy = ny * sep;
-        if (ny < 0) sy *= 0.05;
-        if (ny > 0 && dy < minDist * 0.7) sy *= 0.12;
-
-        Body.setPosition(cat.body, { x: cx + sx, y: cy + sy });
-
-        const bump = (isImpact ? 0.95 : 0.52) * power * Math.min(heavy, 1.35);
-        let bvx = nx * bump;
-        let bvy = ny * bump;
-        if (bvy < 0) bvy = Math.max(bvy, -0.4);
-        if (bvy > 0 && dy < minDist * 0.7) bvy *= 0.15;
-
-        let nvx = cat.body.velocity.x + bvx;
-        let nvy = cat.body.velocity.y + bvy;
-        if (cy < CUP_RIM_Y + 120 && nvy < 0) nvy = Math.max(nvy, -0.6);
-
+        const kick = 1.4 * power;
         Body.setVelocity(cat.body, {
-            x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, nvx)),
-            y: Math.max(-1.3, Math.min(CatPhysics.MAX_CAT_SPEED, nvy))
+            x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + nx * kick)),
+            y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, ny) * kick * 0.6))
         });
 
-        const forceMag = 0.0032 * cat.body.mass * powerScale * (1 + Math.max(overlap, 0) / 5);
-        Body.applyForce(cat.body, cat.body.position, {
-            x: nx * forceMag,
-            y: Math.max(0, ny) * forceMag * 0.25
-        });
-
-        if (isImpact && !mouse.squeaked) {
+        if (!mouse.squeaked) {
             mouse.squeaked = true;
             playMergeSound(1.45);
             spawnFloatingText(mx, my - 20, "Squeak!", "#f48fb1");
         }
     }
 
-    /** Push cats flanking a tight seam so the mouse can slip through */
-    function openBallSeams(mouse) {
-        if ((mouse.stuckTime || 0) < 0.04) return;
-
-        const mx = mouse.body.position.x;
-        const my = mouse.body.position.y;
-        const power = getMousePushPower(mouse);
-        const mouseR = getMouseColliderRadius(mouse);
-
-        const nearby = activeCats.filter(cat => {
-            if (cat.isMouse || !cat.isDropped || cat.isGoldenBall) return false;
-            const dx = cat.body.position.x - mx;
-            const dy = cat.body.position.y - my;
-            return Math.hypot(dx, dy) < mouseR + cat.radius + 18;
-        });
-
-        for (let i = 0; i < nearby.length; i++) {
-            for (let j = i + 1; j < nearby.length; j++) {
-                const a = nearby[i];
-                const b = nearby[j];
-                const ax = a.body.position.x;
-                const ay = a.body.position.y;
-                const bx = b.body.position.x;
-                const by = b.body.position.y;
-                const gap = Math.hypot(bx - ax, by - ay);
-                const minGap = getCatColliderRadius(a) + getCatColliderRadius(b);
-                const seamMidX = (ax + bx) / 2;
-                const seamMidY = (ay + by) / 2;
-
-                if (Math.abs(seamMidX - mx) > mouseR + a.radius * 0.55) continue;
-                if (seamMidY < my - mouseR * 0.2) continue;
-
-                const pinch = minGap - gap;
-                if (pinch > -8) {
-                    const heavy = Math.max(getCatHeavyBoost(a), getCatHeavyBoost(b));
-                    const spread = (Math.max(pinch, 0) + 7) * 0.72 * power * Math.min(heavy, 1.4);
-                    const sign = ax <= bx ? 1 : -1;
-                    Body.setPosition(a.body, { x: ax - sign * spread, y: ay + spread * 0.04 });
-                    Body.setPosition(b.body, { x: bx + sign * spread, y: by + spread * 0.04 });
-                    Body.setVelocity(a.body, {
-                        x: a.body.velocity.x - sign * 1.25 * power,
-                        y: a.body.velocity.y
-                    });
-                    Body.setVelocity(b.body, {
-                        x: b.body.velocity.x + sign * 1.25 * power,
-                        y: b.body.velocity.y
-                    });
-                }
-            }
-        }
-    }
-
-    /** Bulldoze sideways when wedged — only while stuck */
-    function squeezeNearbyCats(mouse, delta) {
+    /**
+     * Continuous outward push field while the mouse is stuck. Pure forces only (no
+     * position teleporting) so it blends into Matter's own solver instead of fighting
+     * it frame-to-frame — that fight (multiple systems hard-repositioning the same
+     * bodies) is what used to look like "shaking" instead of a clean scatter. Combined
+     * with the mouse's real weight, this is now enough to actually fling cats apart
+     * rather than just vibrate against them.
+     */
+    function applyMouseScatterField(mouse) {
         const stuck = mouse.stuckTime || 0;
-        const speed = Math.hypot(mouse.body.velocity.x, mouse.body.velocity.y);
-        if (stuck < 0.05 && speed > 0.38) return;
+        if (stuck < 0.05) return;
 
         const mx = mouse.body.position.x;
         const my = mouse.body.position.y;
         const power = getMousePushPower(mouse);
         const mouseR = getMouseColliderRadius(mouse);
-        const inPile = my > FLOOR_TOP_Y - 280;
-
-        openBallSeams(mouse);
 
         activeCats.forEach(cat => {
             if (cat.isMouse || !cat.isDropped || cat.isGoldenBall) return;
@@ -688,43 +599,75 @@
             const dx = cat.body.position.x - mx;
             const dy = cat.body.position.y - my;
             const dist = Math.hypot(dx, dy) || 0.01;
-            const reach = mouseR + cat.radius + (inPile ? 14 : 10);
+            const reach = mouseR + cat.radius + 16;
             if (dist > reach) return;
 
             const overlap = reach - dist;
-            if (overlap <= 0) return;
+            if (overlap <= 0.15) return; // ignore hairline overlaps — avoids visible micro-jitter at rest
 
+            const nx = dx / dist;
+            const ny = dy / dist;
             const heavy = getCatHeavyBoost(cat);
-            const signX = dx >= 0 ? 1 : -1;
-            const crown = isCrownBlock(mouse, cat);
-            const blocking = crown || (dy <= mouseR && dy >= -cat.radius * 0.55);
-            const pileBoost = inPile && cat.level >= 4 ? 1.18 : 1;
-            const sepX = overlap * (blocking ? 1.05 : 0.72) * power * Math.min(heavy, 1.5) * pileBoost;
-            const sepY = crown ? overlap * 0.02 : (dy > 0 ? overlap * 0.08 * power : overlap * 0.03 * power);
 
-            Body.setPosition(cat.body, {
-                x: cat.body.position.x + signX * sepX,
-                y: cat.body.position.y + sepY
-            });
-            Body.setVelocity(cat.body, {
-                x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + signX * 1.45 * power * Math.min(heavy, 1.35) * pileBoost)),
-                y: cat.body.velocity.y
-            });
-
-            const forceMag = 0.0042 * cat.body.mass * power * Math.min(heavy, 1.45) * pileBoost;
+            // Radial force away from the mouse, scaled by overlap depth and accumulated
+            // stuck power. Proportional to the cat's own mass so the resulting
+            // acceleration (how "hard" the scatter looks) stays consistent across sizes.
+            const forceMag = 0.0075 * cat.body.mass * power * Math.min(heavy, 1.5) * (overlap / reach + 0.4);
             Body.applyForce(cat.body, cat.body.position, {
-                x: signX * forceMag,
-                y: 0
+                x: nx * forceMag,
+                y: ny * forceMag * (ny < 0 ? 0.35 : 0.85)
             });
         });
 
-        if (stuck > 0.12) {
-            const wiggle = Math.sin(mouse.scurryPhase * 2.1) * 0.0045 * mouse.body.mass * power;
-            Body.applyForce(mouse.body, mouse.body.position, {
-                x: wiggle,
-                y: 0
-            });
+        // The mouse itself wiggles/pushes back a bit harder the longer it's stuck,
+        // helping it work its way into the opening its own force field creates.
+        const wiggle = Math.sin(mouse.scurryPhase * 2.1) * 0.006 * mouse.body.mass * power;
+        Body.applyForce(mouse.body, mouse.body.position, { x: wiggle, y: 0 });
+    }
+
+    const MOUSE_FAILSAFE_STUCK_TIME = 4.2; // seconds fully wedged before we guarantee an opening
+
+    /**
+     * Last-resort escape valve: if the mouse has been wedged in a fully-packed pile
+     * longer than MOUSE_FAILSAFE_STUCK_TIME even at max push power (should be rare —
+     * getMousePushPower() ramps to full strength well before this), directly relocate
+     * whichever neighboring cat overlaps it the most to a clear spot beside it. This
+     * guarantees the mouse can never truly soft-lock the cup.
+     */
+    function forceClearMousePath(mouse) {
+        const mx = mouse.body.position.x;
+        const my = mouse.body.position.y;
+        const mouseR = getMouseColliderRadius(mouse);
+
+        let worstCat = null;
+        let worstOverlap = 0;
+        activeCats.forEach(cat => {
+            if (cat.isMouse || !cat.isDropped || cat.isGoldenBall) return;
+            const dx = cat.body.position.x - mx;
+            const dy = cat.body.position.y - my;
+            const dist = Math.hypot(dx, dy) || 0.01;
+            const overlap = (mouseR + getCatColliderRadius(cat)) - dist;
+            if (overlap > worstOverlap) {
+                worstOverlap = overlap;
+                worstCat = cat;
+            }
+        });
+
+        if (!worstCat) {
+            mouse.stuckTime = 0;
+            return;
         }
+
+        const catR = getCatColliderRadius(worstCat);
+        const dx = worstCat.body.position.x - mx;
+        const signX = dx >= 0 ? 1 : -1;
+        const targetX = getClampedX(mx + signX * (mouseR + catR + 10), catR);
+
+        Body.setPosition(worstCat.body, { x: targetX, y: worstCat.body.position.y });
+        Body.setVelocity(worstCat.body, { x: signX * 5, y: worstCat.body.velocity.y * 0.5 });
+        triggerWobble(worstCat, 6);
+
+        mouse.stuckTime = 0;
     }
 
     function getMouseFaceAngle(mouse) {
@@ -752,7 +695,11 @@
             }
 
             steerMouseAroundBlocks(mouse);
-            squeezeNearbyCats(mouse, delta);
+            applyMouseScatterField(mouse);
+
+            if (mouse.stuckTime > MOUSE_FAILSAFE_STUCK_TIME) {
+                forceClearMousePath(mouse);
+            }
 
             clampCatInCup(mouse);
 
@@ -994,7 +941,7 @@
 
     function spawnMergedCat(x, y, level, specialType) {
         const radius = GameState.get_radius(level);
-        const colliderR = radius * 0.98;
+        const colliderR = radius * CatPhysics.COLLIDER_RADIUS_SCALE;
         const clampedX = getClampedX(x, radius);
         const clampedY = Math.min(y, FLOOR_TOP_Y - colliderR);
         const cat = createCat({ level, special: specialType || null }, clampedX, clampedY, true);
@@ -1011,7 +958,7 @@
 
         const level = 11;
         const r = GameState.get_radius(level);
-        const colliderR = r * 0.98;
+        const colliderR = r * CatPhysics.COLLIDER_RADIUS_SCALE;
         const y = FLOOR_TOP_Y - colliderR - 4;
         const touchGap = colliderR * 2 + 6;
         const leftX = 360 - touchGap / 2;
@@ -2942,60 +2889,27 @@
         }
     }
 
-    function bindEvolutionScroll() {
-        const el = document.getElementById("evolution-scroll");
-        if (!el || el.dataset.bound === "1") return;
-        el.dataset.bound = "1";
-
-        let touchStartX = 0;
-        let touchStartScroll = 0;
-        el.addEventListener("touchstart", (e) => {
-            touchStartX = e.touches[0].clientX;
-            touchStartScroll = el.scrollLeft;
-        }, { passive: true });
-        el.addEventListener("touchmove", (e) => {
-            el.scrollLeft = touchStartScroll + (touchStartX - e.touches[0].clientX);
-        }, { passive: true });
-
-        el.addEventListener("wheel", (e) => {
-            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-                el.scrollLeft += e.deltaY;
-                e.preventDefault();
-            }
-        }, { passive: false });
-    }
-
     function populateEvolutionOverlay() {
         const list = document.getElementById("evolution-list");
         list.innerHTML = "";
-        const previewSize = 72;
+        const previewSize = 78;
 
         for (let lvl = 1; lvl <= 11; lvl++) {
             const node = document.createElement("div");
             node.className = "evolution-node";
 
             node.innerHTML = `
-                <canvas class="evolution-img" width="72" height="72"></canvas>
+                <canvas class="evolution-img" width="${previewSize}" height="${previewSize}"></canvas>
                 <span class="evolution-lbl">Lvl ${lvl}</span>
             `;
             list.appendChild(node);
 
             const evoCanvas = node.querySelector("canvas");
             renderEvolutionPreview(evoCanvas, getCatImage(lvl), previewSize);
-
-            if (lvl < 11) {
-                const arrow = document.createElement("span");
-                arrow.className = "evolution-arrow";
-                arrow.textContent = "→";
-                arrow.setAttribute("aria-hidden", "true");
-                list.appendChild(arrow);
-            }
         }
 
-        requestAnimationFrame(() => {
-            const scroll = document.getElementById("evolution-scroll");
-            if (scroll) scroll.scrollLeft = 0;
-        });
+        const scroll = list.closest(".modal-content-scroll");
+        if (scroll) scroll.scrollTop = 0;
     }
 
     // --- Shop items custom renderer ---
@@ -3448,7 +3362,6 @@
         };
 
         // Evolution Overlay
-        bindEvolutionScroll();
         document.getElementById("evolution-btn").onclick = () => {
             populateEvolutionOverlay();
             openModal(document.getElementById("evolution-overlay"));
@@ -3478,7 +3391,16 @@
         setupBoosterButtonRelease();
 
         // Quick restarts
-        document.getElementById("quick-restart-btn").onclick = restartGame;
+        document.getElementById("quick-restart-btn").onclick = () => {
+            openModal(document.getElementById("restart-confirm-overlay"));
+        };
+        document.getElementById("restart-confirm-yes-btn").onclick = () => {
+            closeModal(document.getElementById("restart-confirm-overlay"));
+            restartGame();
+        };
+        document.getElementById("restart-confirm-no-btn").onclick = () => {
+            closeModal(document.getElementById("restart-confirm-overlay"));
+        };
         document.getElementById("gameover-restart-btn").onclick = restartGame;
         document.getElementById("gameover-undo-btn").onclick = () => {
             unlockAudio();

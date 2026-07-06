@@ -10,3 +10,7 @@ android/local.properties
 Thumbs.db
 .cursor/
 *.log
+__pycache__/
+*.pyc
+_apk_old/
+_old.apk.zip

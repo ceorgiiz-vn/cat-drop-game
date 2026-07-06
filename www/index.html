@@ -9,10 +9,11 @@
     <meta name="theme-color" content="#191d32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="assets/sprites/cat_11.png">
+    <link rel="apple-touch-icon" href="assets/app-icon-512.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png">
 
     <title>Cat Drop 2</title>
-    <link rel="stylesheet" href="style.css?v=38">
+    <link rel="stylesheet" href="style.css?v=39">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="js/telegram.js?v=1"></script>
     
@@ -209,10 +210,10 @@
         <div class="modal-overlay" id="evolution-overlay">
             <div class="modal-panel evolution-panel">
                 <h2 class="modal-title">Cat Evolution</h2>
-                <div class="modal-subtitle">Swipe left/right — merge matching cats to advance</div>
-                
-                <div class="evolution-scroll" id="evolution-scroll">
-                    <div class="evolution-list" id="evolution-list">
+                <div class="modal-subtitle">Merge matching cats to advance — Lvl 1 to Lvl 11</div>
+
+                <div class="modal-content-scroll">
+                    <div class="evolution-grid" id="evolution-list">
                         <!-- Populated dynamically -->
                     </div>
                 </div>
@@ -284,6 +285,19 @@
                         ⏪ Step Back
                     </button>
                     <button class="paper-button modal-close-btn" id="gameover-restart-btn" type="button">Play Again</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6b. Quick Restart Confirmation Modal -->
+        <div class="modal-overlay" id="restart-confirm-overlay">
+            <div class="modal-panel">
+                <h2 class="modal-title">Restart Game?</h2>
+                <div class="modal-subtitle">Your current progress will be lost. Are you sure you want to start a new game?</div>
+
+                <div class="resume-btn-container">
+                    <button class="paper-button resume-btn" id="restart-confirm-yes-btn">YES</button>
+                    <button class="paper-button resume-btn" id="restart-confirm-no-btn">NO</button>
                 </div>
             </div>
         </div>
