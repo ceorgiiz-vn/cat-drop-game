@@ -149,8 +149,8 @@
     let cupRightWall = null;
     let cupFloor = null;
 
-    const CUP_WALL_LEFT_X = 90;
-    const CUP_WALL_RIGHT_X = 630;
+    const CUP_WALL_LEFT_X = LEFT_LIMIT - 10;
+    const CUP_WALL_RIGHT_X = RIGHT_LIMIT + 10;
     const CUP_FLOOR_X = 360;
     const CUP_FLOOR_Y = 1110;
     const CUP_PIVOT_X = 360;
@@ -1129,7 +1129,13 @@
 
         // Плавное затухание вращения (угловой скорости) котика,
         // чтобы предотвратить бесконечное кручение вокруг своей оси в углах
-        Body.setAngularVelocity(cat.body, cat.body.angularVelocity * 0.94);
+        const restingOnFloor = y >= maxY - 1.5 && speed < CatPhysics.RESTING_LINEAR_SPEED;
+        if (restingOnFloor && Math.abs(cat.body.angularVelocity) < CatPhysics.RESTING_ANGULAR_SPEED) {
+            Body.setAngularVelocity(cat.body, 0);
+        } else {
+            const damping = restingOnFloor ? CatPhysics.RESTING_ANGULAR_DAMPING : 0.94;
+            Body.setAngularVelocity(cat.body, cat.body.angularVelocity * damping);
+        }
     }
 
     function clampAllCatsInCup() {
