@@ -1196,6 +1196,10 @@
                 y: cat.body.velocity.y * scale
             });
         }
+
+        // Плавное затухание вращения (угловой скорости) котика,
+        // чтобы предотвратить бесконечное кручение вокруг своей оси в углах
+        Body.setAngularVelocity(cat.body, cat.body.angularVelocity * 0.94);
     }
 
     function clampAllCatsInCup() {
