@@ -13,15 +13,15 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png">
 
     <title>Cat Drop 2</title>
-    <link rel="stylesheet" href="style.css?v=41">
+    <link rel="stylesheet" href="style.css?v=42">
     <script src="js/telegram.js?v=1"></script>
     
     <!-- Matter.js Physics Engine -->
     <script src="js/matter.min.js"></script>
     
     <!-- State and Session Manager -->
-    <script src="js/state.js?v=3"></script>
-    <script src="js/game_modes.js?v=6"></script>
+    <script src="js/state.js?v=4"></script>
+    <script src="js/game_modes.js?v=7"></script>
     <script src="js/sprite.js?v=17"></script>
     <script src="js/responsive.js?v=2"></script>
 </head>
@@ -35,7 +35,7 @@
         <!-- Unified top HUD bar -->
         <div class="hud-element hud-top-bar">
             <div class="hud-cell hud-left-top">
-                <button class="paper-button mode-badge" id="mode-badge" title="Change game mode">Classic</button>
+                <span class="mode-badge" id="mode-badge" title="Classic mode">Classic</span>
                 <div class="hud-fish-wallet" title="Fish Coins">
                     <span class="hud-fish-icon" aria-hidden="true">🐟</span>
                     <span class="hud-fish-amount hud-num" id="coin-val" data-digits="1">0</span>
@@ -66,16 +66,16 @@
             <div class="hud-cell hud-right-bottom">
                 <div class="hud-records-grid">
                     <div class="hud-record hud-record-best-cell">
-                        <span class="hud-record-label" id="highscore-title-text">BEST</span>
+                        <span class="hud-record-label" id="highscore-title-text">ALL</span>
                         <span class="hud-record-value hud-num" id="highscore-val" data-digits="1">0</span>
                     </div>
                     <div class="hud-record">
-                        <span class="hud-record-label" id="today-title-text">TODAY</span>
+                        <span class="hud-record-label" id="today-title-text">DAY</span>
                         <span class="hud-record-value hud-num" id="today-val" data-digits="1">0</span>
                     </div>
                     <div class="hud-record">
-                        <span class="hud-record-label" id="daily-title-text">DAILY</span>
-                        <span class="hud-record-value hud-num" id="daily-val" data-digits="1">0</span>
+                        <span class="hud-record-label" id="year-title-text">YEAR</span>
+                        <span class="hud-record-value hud-num" id="year-val" data-digits="1">0</span>
                     </div>
                 </div>
             </div>
@@ -98,17 +98,17 @@
 
         <!-- Boosters container at left -->
         <div class="hud-element boosters-container">
-            <button class="paper-button booster-btn" id="yarn-btn" title="SHAKE: jostle the cup (150 🐟)">
+            <button class="paper-button booster-btn" id="yarn-btn" title="SHAKE: jostle the cup (1000 🐟)">
                 <span class="booster-label">SHAKE</span>
-                <span class="booster-cost">150 🐟</span>
+                <span class="booster-cost">1000 🐟</span>
             </button>
-            <button class="paper-button booster-btn" id="fishbone-btn" title="POP: erase one cat (350 🐟)">
+            <button class="paper-button booster-btn" id="fishbone-btn" title="POP: erase one cat (2500 🐟)">
                 <svg class="booster-needle" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 20 L20 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
                     <path d="M16 4 L20 4 L20 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
                     <circle cx="5" cy="19" r="1.6" fill="currentColor"/>
                 </svg>
-                <span class="booster-cost">350 🐟</span>
+                <span class="booster-cost">2500 🐟</span>
             </button>
         </div>
 
@@ -164,7 +164,6 @@
                 <div class="leaderboard-tabs">
                     <button class="paper-button leaderboard-tab-btn active" data-tab="alltime">All-Time</button>
                     <button class="paper-button leaderboard-tab-btn" data-tab="today">Today</button>
-                    <button class="paper-button leaderboard-tab-btn" data-tab="daily">Daily ★</button>
                 </div>
                 
                 <div class="modal-content-scroll" id="leaderboard-scroll">
@@ -176,31 +175,6 @@
                 <div id="leaderboard-status" style="font-size: 14px; margin-bottom: 15px; color: var(--accent-color); text-align: center;"></div>
 
                 <button class="paper-button modal-close-btn" id="leaderboard-close-btn">CLOSE</button>
-            </div>
-        </div>
-
-        <!-- 2b. Game Mode Select Modal -->
-        <div class="modal-overlay" id="mode-overlay">
-            <div class="modal-panel">
-                <h2 class="modal-title">Choose Mode</h2>
-                <div class="modal-subtitle">Same cats, different chaos!</div>
-
-                <div class="mode-select-list">
-                    <button class="paper-button mode-select-btn" id="mode-classic-btn">
-                        <span class="mode-select-title">Classic</span>
-                        <span class="mode-select-desc">Golden balls &amp; mouse surprises</span>
-                    </button>
-                    <button class="paper-button mode-select-btn" id="mode-daily-btn">
-                        <span class="mode-select-title">Daily Challenge ★</span>
-                        <span class="mode-select-desc">Same spawn order for everyone today</span>
-                    </button>
-                    <button class="paper-button mode-select-btn" id="mode-chaos-btn">
-                        <span class="mode-select-title">Chaos Cup ↻</span>
-                        <span class="mode-select-desc">Gentle tilt, sticky, soapy, boom balls!</span>
-                    </button>
-                </div>
-
-                <button class="paper-button modal-close-btn" id="mode-close-btn">CLOSE</button>
             </div>
         </div>
 
@@ -253,11 +227,9 @@
                     <ul class="help-list">
                         <li>Tap or click inside the glass tumbler to drop your current cat bubble.</li>
                         <li>A rare <strong>Golden Ball</strong> may appear — it becomes the cat it touches first!</li>
-                        <li>A rare <strong>Mouse</strong> 🐭 may appear — drop her and she scurries down, squeezing between cats and pushing them apart (tail wagging!). Cats can even merge from the shuffle!</li>
+                        <li>A rare <strong>Mouse</strong> may appear with a needle sword and pop the first cat she touches.</li>
                         <li>When two cats of the same level touch, they merge into a larger cat!</li>
-                        <li><strong>Classic</strong> — normal play with golden &amp; mouse balls.</li>
-                        <li><strong>Daily ★</strong> — everyone gets the same spawn sequence today. Compete on the Daily tab!</li>
-                        <li><strong>Chaos ↻</strong> — the cup briefly teeters (~22°) now and then, plus sticky, soapy, heavy, explosive &amp; ghost balls.</li>
+                        <li><strong>Classic</strong> is the only game mode.</li>
                         <li>Level 11 (Space Cat) is the ultimate size. Try to reach it for maximum score!</li>
                         <li>Keep cats inside the tumbler. If any cat overflows above the red line for 3 seconds, it is GAME OVER.</li>
                         <li>Use <strong>SHAKE</strong> (left) to jostle the stack, or <strong>POP</strong> (needle) to erase one cat.</li>
@@ -322,7 +294,7 @@
     <script src="js/physics.js?v=8"></script>
 
     <!-- Core Game Controller Logic -->
-    <script src="js/game.js?v=78"></script>
+    <script src="js/game.js?v=79"></script>
     
     <!-- Register Service Worker -->
     <script>

@@ -1,4 +1,4 @@
-// Cat Drop: Evolution - Core Game Logic
+﻿// Cat Drop: Evolution - Core Game Logic
 
 (function() {
     // Canvas & Graphics Context
@@ -20,12 +20,8 @@
     let currentCat = null;
     let nextSpawn = { level: 1, special: null };
     let currentGameMode = GameModes.MODES.CLASSIC;
-    let dailySpawnIndex = 0;
     let cupTiltAngle = 0;
     let cupTiltTarget = 0;
-    let chaosTimer = 0;
-    let chaosTiltPhase = "idle";
-    let chaosWarningTimer = 0;
     let mergeCountSinceTilt = 0;
     let leaderboardTab = "alltime";
     let canDrop = true;
@@ -134,8 +130,9 @@
     const CUP_PHYSICS_TOP_Y = 80; // invisible wall extension above visual rim (avoids top-corner bounce)
     const FLOOR_TOP_Y = 1100;
     const mergingBodyIds = new Set();
-    const CHAOS_TILT_RAD = Math.PI / 8; // ~22.5° — proportional cup teeter, not sideways magnet
     const MOUSE_RADIUS = 22 * GameState.CAT_SIZE_SCALE;
+    const BOOSTER_SHAKE_COST = 1000;
+    const BOOSTER_POP_COST = 2500;
     /** TEMP: spawn two lvl-11 cats for easter-egg testing — set false before release */
     const DEBUG_ULTIMATE_EGG_TEST = false;
     const FINAL_MOUSE_TUNING = {
@@ -347,8 +344,6 @@
                         if (catA.specialType === GameModes.SPECIAL.EXPLOSIVE || catB.specialType === GameModes.SPECIAL.EXPLOSIVE) {
                             triggerExplosion(midX, midY, catA.level);
                         }
-
-                        onChaosMerge();
 
                         // Trigger effects
                         triggerMergeEffects(midX, midY, newLevel);
@@ -676,12 +671,7 @@
 
     function rollNextSpawn(lastSpec) {
         const exclude = spawnExcludeFrom(lastSpec);
-        if (currentGameMode === GameModes.MODES.DAILY) {
-            const spec = ensureSpawnAllowed(GameModes.getNextSpawn(currentGameMode, dailySpawnIndex, null, exclude));
-            dailySpawnIndex++;
-            return spec;
-        }
-        return ensureSpawnAllowed(GameModes.getNextSpawn(currentGameMode, 0, null, exclude));
+        return ensureSpawnAllowed(GameModes.getNextSpawn(GameModes.MODES.CLASSIC, 0, null, exclude));
     }
 
     function tryTransformGoldenBall(goldenCat, otherCat) {
@@ -768,54 +758,9 @@
         applyCupGravity();
     }
 
-    function updateChaosTilt(delta) {
-        if (currentGameMode !== GameModes.MODES.CHAOS || isGameOver) {
-            if (cupTiltAngle !== 0 || cupTiltTarget !== 0 || engine.gravity.x !== 0) {
-                settleCupUpright(delta);
-            }
-            return;
-        }
-
-        chaosTimer += delta;
-
-        if (chaosTiltPhase === "idle" && chaosTimer >= 55) {
-            chaosTiltPhase = "warn";
-            chaosWarningTimer = 1.8;
-            spawnFloatingText(360, 300, "↻ Cup tilts!", "#ffb300");
-        }
-
-        if (chaosTiltPhase === "warn") {
-            chaosWarningTimer -= delta;
-            if (chaosWarningTimer <= 0) {
-                chaosTiltPhase = "tilted";
-                cupTiltTarget = CHAOS_TILT_RAD;
-                chaosTimer = 0;
-            }
-        }
-
-        if (chaosTiltPhase === "tilted") {
-            if (chaosTimer >= 3.5) {
-                chaosTiltPhase = "idle";
-                cupTiltTarget = 0;
-                chaosTimer = 0;
-            }
-        }
-
-        const tiltSpeed = cupTiltTarget === 0 ? 10 : 4;
-        cupTiltAngle += (cupTiltTarget - cupTiltAngle) * Math.min(1, delta * tiltSpeed);
-        if (Math.abs(cupTiltTarget - cupTiltAngle) < 0.001) cupTiltAngle = cupTiltTarget;
-        applyCupGravity();
-    }
-
-    function onChaosMerge() {
-        if (currentGameMode !== GameModes.MODES.CHAOS) return;
-        mergeCountSinceTilt++;
-        if (chaosTiltPhase === "idle" && mergeCountSinceTilt >= 12) {
-            mergeCountSinceTilt = 0;
-            chaosTiltPhase = "warn";
-            chaosWarningTimer = 1.2;
-            chaosTimer = 0;
-            spawnFloatingText(360, 300, "↻ Merge tilt!", "#ffb300");
+    function settleCupIfNeeded(delta) {
+        if (cupTiltAngle !== 0 || cupTiltTarget !== 0 || engine.gravity.x !== 0) {
+            settleCupUpright(delta);
         }
     }
 
@@ -901,12 +846,8 @@
             current_spawn: getSpawnSpecFromCat(currentCat),
             next_spawn: { ...nextSpawn, special: nextSpawn.special || null },
             game_mode: currentGameMode,
-            daily_spawn_index: dailySpawnIndex,
             cup_tilt: cupTiltAngle,
             cup_tilt_target: cupTiltTarget,
-            chaos_timer: chaosTimer,
-            chaos_tilt_phase: chaosTiltPhase,
-            chaos_warning_timer: chaosWarningTimer,
             merge_count_since_tilt: mergeCountSinceTilt
         };
     }
@@ -965,23 +906,10 @@
 
         GameState.score = snap.score;
         GameState.fish_coins = snap.fish_coins;
-        currentGameMode = snap.game_mode;
-        dailySpawnIndex = snap.daily_spawn_index;
-        if (currentGameMode === GameModes.MODES.CHAOS) {
-            cupTiltAngle = snap.cup_tilt;
-            cupTiltTarget = snap.cup_tilt_target;
-            chaosTimer = snap.chaos_timer;
-            chaosTiltPhase = snap.chaos_tilt_phase;
-            chaosWarningTimer = snap.chaos_warning_timer;
-            mergeCountSinceTilt = snap.merge_count_since_tilt;
-        } else {
-            cupTiltAngle = 0;
-            cupTiltTarget = 0;
-            chaosTimer = 0;
-            chaosTiltPhase = "idle";
-            chaosWarningTimer = 0;
-            mergeCountSinceTilt = 0;
-        }
+        currentGameMode = GameModes.MODES.CLASSIC;
+        cupTiltAngle = 0;
+        cupTiltTarget = 0;
+        mergeCountSinceTilt = 0;
         applyCupGravity();
 
         restoreCatsFromSnapshot(snap.cats);
@@ -1731,7 +1659,7 @@
 
         // Notebook paper cards are now drawn via HTML/CSS directly
 
-        // Draw wobbly Glass Cup boundaries (rotates with Chaos tilt — synced to physics walls)
+        // Draw wobbly Glass Cup boundaries synced to physics walls.
         ctx.save();
         ctx.translate(CUP_PIVOT_X, CUP_PIVOT_Y);
         ctx.rotate(cupTiltAngle);
@@ -1838,9 +1766,6 @@
                 ctx.textBaseline = "middle";
                 ctx.fillText(level, 0, 0);
             }
-            if (cat.specialType && currentGameMode === GameModes.MODES.CHAOS) {
-                CatSprite.drawSpecialRing(ctx, radius, cat.specialType, Date.now());
-            }
         }
 
         ctx.restore();
@@ -1919,7 +1844,7 @@
         applyHudNum(document.getElementById("highscore-val"), GameState.highscore);
         GameState.resetTodayIfNeeded();
         applyHudNum(document.getElementById("today-val"), GameState.today_best);
-        applyHudNum(document.getElementById("daily-val"), GameState.daily_best);
+        applyHudNum(document.getElementById("year-val"), GameState.year_best);
         applyHudNum(document.getElementById("coin-val"), GameState.fish_coins);
         updatePlayerChip();
         
@@ -1928,13 +1853,13 @@
         if (balLabel) balLabel.textContent = `Your Balance: 🐟 ${formatHudNum(GameState.fish_coins)}`;
 
         // Disable boosters if coins insufficient
-        document.getElementById("yarn-btn").disabled = (GameState.fish_coins < 150) || isTargetingEraser;
-        document.getElementById("fishbone-btn").disabled = (GameState.fish_coins < 350) && !isTargetingEraser;
+        document.getElementById("yarn-btn").disabled = (GameState.fish_coins < BOOSTER_SHAKE_COST) || isTargetingEraser;
+        document.getElementById("fishbone-btn").disabled = (GameState.fish_coins < BOOSTER_POP_COST) && !isTargetingEraser;
     }
 
     function updateNextPreview() {
         const preview = document.getElementById("next-preview-image");
-        const previewD = 62;
+        const previewD = 74;
         if (isMouseSpawn(nextSpawn)) {
             CatSprite.renderMousePreview(preview, previewD, 0.9, FINAL_MOUSE_TUNING);
         } else if (isGoldenSpawn(nextSpawn)) {
@@ -1950,21 +1875,13 @@
     }
 
     function startGameMode(mode) {
-        currentGameMode = mode;
-        dailySpawnIndex = 0;
+        currentGameMode = GameModes.MODES.CLASSIC;
         totalDropsThisSession = 0;
         cupTiltAngle = 0;
         cupTiltTarget = 0;
-        chaosTimer = 0;
-        chaosTiltPhase = "idle";
         mergeCountSinceTilt = 0;
         applyCupGravity();
-        if (mode === GameModes.MODES.DAILY) {
-            nextSpawn = ensureSpawnAllowed(GameModes.getNextSpawn(mode, 0));
-            dailySpawnIndex = 1;
-        } else {
-            nextSpawn = ensureSpawnAllowed(GameModes.getNextSpawn(mode, 0));
-        }
+        nextSpawn = ensureSpawnAllowed(GameModes.getNextSpawn(GameModes.MODES.CLASSIC, 0));
         updateModeBadge();
     }
 
@@ -2064,7 +1981,7 @@
 
         // Step physics engine
         if (!isGameOver) {
-            updateChaosTilt(delta);
+            settleCupIfNeeded(delta);
             Engine.update(engine, 1000 / 60);
             clampAllCatsInCup();
             updateMice(delta);
@@ -2278,12 +2195,12 @@
 
             if (clickedCat) {
                 isTargetingEraser = false;
-                GameState.addFishCoins(-350);
+                GameState.addFishCoins(-BOOSTER_POP_COST);
 
                 // Burst particles
                 triggerMergeEffects(clickedCat.body.position.x, clickedCat.body.position.y, clickedCat.level);
                 // Flying cost indicator
-                spawnFloatingText(clickedCat.body.position.x, clickedCat.body.position.y, "-350 🐟 Erase!", "#ffd700");
+                spawnFloatingText(clickedCat.body.position.x, clickedCat.body.position.y, `-${BOOSTER_POP_COST} 🐟 Erase!`, "#ffd700");
 
                 // Remove from Matter world and active array
                 Composite.remove(engine.world, clickedCat.body);
@@ -2392,7 +2309,6 @@
         if (isGameOver) return;
         GameState.saveActiveSession(GameState.score, GameState.fish_coins, nextSpawn, getSerializableCats(), {
             game_mode: currentGameMode,
-            daily_spawn_index: dailySpawnIndex,
             cup_tilt: cupTiltAngle,
             total_drops: totalDropsThisSession
         });
@@ -2406,15 +2322,9 @@
 
             GameState.score = data.score;
             GameState.fish_coins = data.fish_coins;
-            currentGameMode = data.game_mode || GameModes.MODES.CLASSIC;
-            dailySpawnIndex = data.daily_spawn_index || 0;
-            if (currentGameMode === GameModes.MODES.CHAOS) {
-                cupTiltAngle = data.cup_tilt || 0;
-                cupTiltTarget = cupTiltAngle;
-            } else {
-                cupTiltAngle = 0;
-                cupTiltTarget = 0;
-            }
+            currentGameMode = GameModes.MODES.CLASSIC;
+            cupTiltAngle = 0;
+            cupTiltTarget = 0;
             applyCupGravity();
 
             totalDropsThisSession = data.total_drops || data.cats.length;
@@ -2501,10 +2411,10 @@
     }
 
     function useYarnBall() {
-        if (GameState.fish_coins < 150 || isTargetingEraser) return;
-        GameState.addFishCoins(-150);
+        if (GameState.fish_coins < BOOSTER_SHAKE_COST || isTargetingEraser) return;
+        GameState.addFishCoins(-BOOSTER_SHAKE_COST);
         playMergeSound(1.2);
-        spawnFloatingText(360, 500, "-150 🐟 SHAKE!", "#ffd700");
+        spawnFloatingText(360, 500, `-${BOOSTER_SHAKE_COST} 🐟 SHAKE!`, "#ffd700");
 
         activeCats.forEach(cat => {
             if (cat.isDropped) {
@@ -2524,7 +2434,7 @@
             isTargetingEraser = false;
             updateTargetingUI();
         } else {
-            if (GameState.fish_coins >= 350) {
+            if (GameState.fish_coins >= BOOSTER_POP_COST) {
                 isTargetingEraser = true;
                 updateTargetingUI();
             }
@@ -2674,9 +2584,6 @@
 
         GameState.submitToLeaderboard("cat_drop_mock_leaderboard", GameState.player_name, GameState.highscore);
         GameState.submitToLeaderboard(GameState.getTodayLeaderboardKey(), GameState.player_name, GameState.today_best);
-        if (GameState.daily_best > 0) {
-            GameState.submitToLeaderboard(GameState.getDailyLeaderboardKey(), GameState.player_name, GameState.daily_best);
-        }
     }
 
     function switchLeaderboardTab(tab) {
@@ -2694,7 +2601,6 @@
         const subtitle = document.getElementById("leaderboard-subtitle");
         if (subtitle) {
             if (leaderboardTab === "today") subtitle.textContent = `Best Today — ${GameState.getTodayKey()}`;
-            else if (leaderboardTab === "daily") subtitle.textContent = `Daily Challenge — ${GameState.getTodayKey()}`;
             else subtitle.textContent = "Top Cat Evolutionists (All-Time)";
         }
 
@@ -2730,34 +2636,10 @@
         let scores;
         if (leaderboardTab === "today") {
             scores = GameState.getLeaderboard(GameState.getTodayLeaderboardKey());
-        } else if (leaderboardTab === "daily") {
-            scores = GameState.getLeaderboard(GameState.getDailyLeaderboardKey());
         } else {
             scores = GameState.getLeaderboard("cat_drop_mock_leaderboard");
         }
         renderLeaderboard(scores);
-    }
-
-    function openModeSelectModal() {
-        openModal(document.getElementById("mode-overlay"));
-    }
-
-    function selectGameMode(mode) {
-        closeModal(document.getElementById("mode-overlay"));
-        const wasPlaying = activeCats.length > 0 || currentCat || GameState.score > 0;
-
-        if (mode !== currentGameMode && wasPlaying) {
-            currentGameMode = mode;
-            restartGame();
-            return;
-        }
-
-        startGameMode(mode);
-        updateHUD();
-        if (!currentCat && !isGameOver) {
-            spawnNewCat();
-            if (!GameState.player_name) openNicknameModal();
-        }
     }
 
     function renderLeaderboard(scores) {
@@ -3190,7 +3072,7 @@
         document.getElementById("score-title-text").style.color = colors.title;
         document.getElementById("highscore-title-text").style.color = colors.title;
         document.getElementById("today-title-text").style.color = colors.title;
-        document.getElementById("daily-title-text").style.color = colors.title;
+        document.getElementById("year-title-text").style.color = colors.title;
         document.getElementById("highscore-val").style.color = colors.best;
         document.getElementById("next-title-text").style.color = colors.title;
 
@@ -3257,20 +3139,6 @@
         document.querySelectorAll(".leaderboard-tab-btn").forEach(btn => {
             btn.onclick = () => switchLeaderboardTab(btn.dataset.tab);
         });
-
-        const modeBadge = document.getElementById("mode-badge");
-        if (modeBadge) modeBadge.onclick = openModeSelectModal;
-        document.getElementById("mode-classic-btn").onclick = () => selectGameMode(GameModes.MODES.CLASSIC);
-        document.getElementById("mode-daily-btn").onclick = () => selectGameMode(GameModes.MODES.DAILY);
-        document.getElementById("mode-chaos-btn").onclick = () => selectGameMode(GameModes.MODES.CHAOS);
-        document.getElementById("mode-close-btn").onclick = () => {
-            closeModal(document.getElementById("mode-overlay"));
-            if (!currentCat && !isGameOver && !GameState.hasSavedSession()) {
-                startGameMode(currentGameMode);
-                spawnNewCat();
-                if (!GameState.player_name) openNicknameModal();
-            }
-        };
 
         // Evolution Overlay
         document.getElementById("evolution-btn").onclick = () => {
@@ -3354,7 +3222,9 @@
             if (GameState.hasSavedSession()) {
                 openModal(document.getElementById("resume-overlay"));
             } else {
-                openModeSelectModal();
+                startGameMode(GameModes.MODES.CLASSIC);
+                spawnNewCat();
+                if (!GameState.player_name) openNicknameModal();
             }
         }
 

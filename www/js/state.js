@@ -6,8 +6,8 @@ const GameState = {
     highscore: 0,
     today_best: 0,
     today_date: "",
-    daily_best: 0,
-    daily_date: "",
+    year_best: 0,
+    year_date: "",
     player_name: "",
     fish_coins: 0,
     unlocked_themes: ["Indigo Night"],
@@ -62,8 +62,8 @@ const GameState = {
                 this.highscore = data.highscore ?? 0;
                 this.today_best = data.today_best ?? 0;
                 this.today_date = data.today_date ?? "";
-                this.daily_best = data.daily_best ?? 0;
-                this.daily_date = data.daily_date ?? "";
+                this.year_best = data.year_best ?? 0;
+                this.year_date = data.year_date ?? "";
                 this.player_name = data.player_name ?? "";
                 this.google_sheets_url = data.google_sheets_url ?? "";
                 this.fish_coins = data.fish_coins ?? 0;
@@ -94,8 +94,8 @@ const GameState = {
             highscore: this.highscore,
             today_best: this.today_best,
             today_date: this.today_date,
-            daily_best: this.daily_best,
-            daily_date: this.daily_date,
+            year_best: this.year_best,
+            year_date: this.year_date,
             player_name: this.player_name,
             google_sheets_url: this.google_sheets_url,
             fish_coins: this.fish_coins,
@@ -115,37 +115,53 @@ const GameState = {
         return new Date().toISOString().slice(0, 10);
     },
 
+    getYearKey() {
+        return new Date().getFullYear().toString();
+    },
+
     resetTodayIfNeeded() {
         const today = this.getTodayKey();
+        const year = this.getYearKey();
         if (this.today_date !== today) {
             this.today_date = today;
             this.today_best = 0;
             this.save();
         }
-        if (this.daily_date !== today) {
-            this.daily_date = today;
-            this.daily_best = 0;
+        if (this.year_date !== year) {
+            this.year_date = year;
+            this.year_best = 0;
             this.save();
         }
     },
 
     recordScoreForModes(score, gameMode) {
         this.resetTodayIfNeeded();
+        this.updateBestScores(score);
+        this.save();
+    },
+
+    updateBestScores(score) {
         if (score > this.today_best) {
             this.today_best = score;
             this.today_date = this.getTodayKey();
         }
-        if (gameMode === "daily" && score > this.daily_best) {
-            this.daily_best = score;
-            this.daily_date = this.getTodayKey();
+        if (score > this.year_best) {
+            this.year_best = score;
+            this.year_date = this.getYearKey();
         }
-        this.save();
+        if (score > this.highscore) {
+            this.highscore = score;
+        }
     },
 
     addScore(amount) {
         this.score += amount;
-        if (this.score > this.highscore) {
-            this.highscore = this.score;
+        const beforeHigh = this.highscore;
+        const beforeToday = this.today_best;
+        const beforeYear = this.year_best;
+        this.resetTodayIfNeeded();
+        this.updateBestScores(this.score);
+        if (this.highscore !== beforeHigh || this.today_best !== beforeToday || this.year_best !== beforeYear) {
             this.save();
         }
     },
@@ -243,7 +259,6 @@ const GameState = {
             fish_coins: current_coins,
             next_spawn: next_spawn,
             game_mode: extra?.game_mode || "classic",
-            daily_spawn_index: extra?.daily_spawn_index || 0,
             cup_tilt: extra?.cup_tilt || 0,
             total_drops: extra?.total_drops || 0,
             cats: catsData
@@ -274,10 +289,6 @@ const GameState = {
 
     getTodayLeaderboardKey(dateKey) {
         return `cat_drop_today_leaderboard_${dateKey || this.getTodayKey()}`;
-    },
-
-    getDailyLeaderboardKey(dateKey) {
-        return `cat_drop_daily_leaderboard_${dateKey || this.getTodayKey()}`;
     },
 
     submitToLeaderboard(storageKey, name, score) {
