@@ -174,7 +174,8 @@
             dropSpeed: 6.8,
             wiggleForce: 0.00065,
             scurryRate: 9,
-            contactShake: 0.25
+            contactShake: 0.35,
+            chainShakeReach: 52
         },
         {
             id: "shake_2",
@@ -203,7 +204,8 @@
             dropSpeed: 6.8,
             wiggleForce: 0.00065,
             scurryRate: 9,
-            contactShake: 0.5
+            contactShake: 0.85,
+            chainShakeReach: 64
         },
         {
             id: "shake_3",
@@ -232,7 +234,8 @@
             dropSpeed: 6.8,
             wiggleForce: 0.00065,
             scurryRate: 9,
-            contactShake: 0.75
+            contactShake: 1.35,
+            chainShakeReach: 76
         },
         {
             id: "shake_4",
@@ -261,7 +264,8 @@
             dropSpeed: 6.8,
             wiggleForce: 0.00065,
             scurryRate: 9,
-            contactShake: 1
+            contactShake: 2.0,
+            chainShakeReach: 88
         },
         {
             id: "shake_5",
@@ -290,7 +294,8 @@
             dropSpeed: 6.8,
             wiggleForce: 0.00065,
             scurryRate: 9,
-            contactShake: 1.25
+            contactShake: 2.8,
+            chainShakeReach: 104
         },
         {
             id: "soft",
@@ -930,6 +935,32 @@
         });
         Body.setAngularVelocity(cat.body, cat.body.angularVelocity + side * (0.035 + strength * 0.03) * shake);
         triggerWobble(cat, 5 + shake * 4 + strength * 2);
+
+        const reachPad = mouseParam(mouse, "chainShakeReach", 60);
+        activeCats.forEach(other => {
+            if (other === cat || other.isMouse || other.isGoldenBall || !other.isDropped || other.isMerged) return;
+            if (other.lastMouseChainShakeAt && now - other.lastMouseChainShakeAt < cooldown) return;
+
+            const dx = other.body.position.x - cat.body.position.x;
+            const dy = other.body.position.y - cat.body.position.y;
+            const dist = Math.hypot(dx, dy) || 0.01;
+            const reach = getCatColliderRadius(cat) + getCatColliderRadius(other) + reachPad;
+            if (dist > reach) return;
+
+            const falloff = Math.pow(1 - dist / reach, 1.35);
+            if (falloff <= 0.02) return;
+            other.lastMouseChainShakeAt = now;
+
+            const nudgeSide = Math.abs(dx) > 2 ? Math.sign(dx) : side;
+            const chainLift = lift * 0.62 * falloff;
+            const chainSide = (sideways * 0.45 + nudgeSide * shake * 0.18) * falloff;
+            Body.setVelocity(other.body, {
+                x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, other.body.velocity.x + chainSide)),
+                y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, other.body.velocity.y - chainLift))
+            });
+            Body.setAngularVelocity(other.body, other.body.angularVelocity + nudgeSide * (0.018 + strength * 0.018) * shake * falloff);
+            if (falloff > 0.18) triggerWobble(other, 3 + shake * 3 * falloff);
+        });
     }
 
     /**
@@ -1356,42 +1387,38 @@
         mouseLabCupSeeded = true;
 
         const labCats = [
-            { x: 175, y: 1014, level: 7, angle: -0.14 },
-            { x: 360, y: 1018, level: 8, angle: 0.09 },
-            { x: 545, y: 1014, level: 7, angle: 0.13 },
-            { x: 108, y: 1046, level: 3, angle: 0.12 },
-            { x: 612, y: 1046, level: 3, angle: -0.12 },
-            { x: 155, y: 915, level: 6, angle: 0.16 },
-            { x: 330, y: 908, level: 7, angle: -0.1 },
-            { x: 505, y: 915, level: 6, angle: 0.08 },
-            { x: 610, y: 928, level: 2, angle: -0.18 },
-            { x: 115, y: 824, level: 4, angle: -0.12 },
-            { x: 245, y: 808, level: 5, angle: 0.14 },
-            { x: 378, y: 820, level: 5, angle: -0.08 },
-            { x: 515, y: 808, level: 5, angle: 0.16 },
-            { x: 612, y: 824, level: 2, angle: 0.1 },
-            { x: 166, y: 710, level: 6, angle: 0.08 },
-            { x: 340, y: 704, level: 7, angle: -0.16 },
-            { x: 516, y: 710, level: 6, angle: 0.12 },
-            { x: 104, y: 636, level: 3, angle: -0.08 },
-            { x: 225, y: 612, level: 5, angle: 0.14 },
-            { x: 360, y: 612, level: 5, angle: -0.12 },
-            { x: 495, y: 612, level: 5, angle: 0.1 },
-            { x: 616, y: 636, level: 3, angle: -0.16 },
-            { x: 150, y: 510, level: 4, angle: 0.12 },
-            { x: 275, y: 500, level: 4, angle: -0.08 },
-            { x: 400, y: 500, level: 4, angle: 0.16 },
-            { x: 530, y: 510, level: 4, angle: -0.14 },
-            { x: 102, y: 420, level: 2, angle: 0.08 },
-            { x: 205, y: 400, level: 3, angle: -0.16 },
-            { x: 315, y: 390, level: 4, angle: 0.12 },
-            { x: 435, y: 400, level: 3, angle: -0.1 },
-            { x: 545, y: 420, level: 2, angle: 0.14 },
-            { x: 150, y: 330, level: 1, angle: -0.12 },
-            { x: 250, y: 325, level: 2, angle: 0.1 },
-            { x: 360, y: 322, level: 2, angle: -0.08 },
-            { x: 470, y: 325, level: 2, angle: 0.16 },
-            { x: 570, y: 330, level: 1, angle: -0.14 }
+            { x: 268, y: 1000, level: 8, angle: 0.12 },
+            { x: 515, y: 988, level: 7, angle: -0.05 },
+            { x: 396, y: 861, level: 7, angle: 0.05 },
+            { x: 171, y: 855, level: 6, angle: 0.11 },
+            { x: 554, y: 810, level: 6, angle: -0.07 },
+            { x: 280, y: 738, level: 6, angle: -0.04 },
+            { x: 439, y: 712, level: 5, angle: -0.13 },
+            { x: 153, y: 666, level: 5, angle: -0.13 },
+            { x: 561, y: 634, level: 5, angle: 0.0 },
+            { x: 345, y: 606, level: 5, angle: -0.08 },
+            { x: 227, y: 551, level: 4, angle: -0.06 },
+            { x: 463, y: 545, level: 4, angle: 0.08 },
+            { x: 571, y: 486, level: 4, angle: -0.14 },
+            { x: 324, y: 479, level: 4, angle: 0.04 },
+            { x: 153, y: 453, level: 4, angle: 0.09 },
+            { x: 430, y: 441, level: 3, angle: -0.14 },
+            { x: 254, y: 389, level: 3, angle: 0.10 },
+            { x: 506, y: 378, level: 3, angle: -0.09 },
+            { x: 383, y: 353, level: 3, angle: -0.07 },
+            { x: 153, y: 343, level: 3, angle: 0.09 },
+            { x: 126, y: 557, level: 2, angle: 0.06 },
+            { x: 597, y: 375, level: 2, angle: -0.11 },
+            { x: 306, y: 299, level: 2, angle: -0.07 },
+            { x: 584, y: 296, level: 2, angle: 0.10 },
+            { x: 466, y: 296, level: 2, angle: -0.08 },
+            { x: 116, y: 762, level: 1, angle: 0.02 },
+            { x: 148, y: 960, level: 1, angle: 0.03 },
+            { x: 395, y: 979, level: 1, angle: -0.09 },
+            { x: 605, y: 908, level: 1, angle: 0.04 },
+            { x: 221, y: 302, level: 1, angle: 0.10 },
+            { x: 280, y: 846, level: 1, angle: 0.14 },
+            { x: 137, y: 1023, level: 1, angle: 0.03 }
         ];
 
         labCats.forEach(spec => {
