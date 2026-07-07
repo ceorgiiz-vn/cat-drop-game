@@ -145,8 +145,153 @@
     const DEBUG_ULTIMATE_EGG_TEST = false;
     /** TEMP: mouse behavior lab — remove after choosing the final mouse */
     const DEBUG_MOUSE_LAB = true;
-    const MOUSE_LAB_ACTIVE_VARIANTS = ["heavy", "ghost", "drop"];
+    const MOUSE_LAB_ACTIVE_VARIANTS = ["shake_1", "shake_2", "shake_3", "shake_4", "shake_5"];
     const MOUSE_LAB_VARIANTS = [
+        {
+            id: "shake_1",
+            label: "1",
+            name: "Shake 1",
+            bodyColor: "#ffd166",
+            headColor: "#ffe08a",
+            earColor: "#fff0ba",
+            strokeColor: "#8a5d00",
+            tailColor: "#d99b24",
+            noseColor: "#ef476f",
+            density: 0.075,
+            friction: 0.028,
+            restitution: 0.12,
+            frictionAir: 0.004,
+            radiusScale: 1.04,
+            colliderScale: 0.64,
+            impactKick: 0.75,
+            clearRadiusScale: 1,
+            clearCorrection: 0.56,
+            clearImpulse: 0.46,
+            stuckSpeed: 0.34,
+            phaseAfter: 0.62,
+            phaseDuration: 0.38,
+            phaseFallSpeed: 255,
+            dropSpeed: 6.8,
+            wiggleForce: 0.00065,
+            scurryRate: 9,
+            contactShake: 0.25
+        },
+        {
+            id: "shake_2",
+            label: "2",
+            name: "Shake 2",
+            bodyColor: "#b388ff",
+            headColor: "#c8a8ff",
+            earColor: "#eadcff",
+            strokeColor: "#5b3b9a",
+            tailColor: "#a177ed",
+            noseColor: "#ffdf6b",
+            density: 0.075,
+            friction: 0.028,
+            restitution: 0.12,
+            frictionAir: 0.004,
+            radiusScale: 1.04,
+            colliderScale: 0.64,
+            impactKick: 0.75,
+            clearRadiusScale: 1,
+            clearCorrection: 0.56,
+            clearImpulse: 0.46,
+            stuckSpeed: 0.34,
+            phaseAfter: 0.62,
+            phaseDuration: 0.38,
+            phaseFallSpeed: 255,
+            dropSpeed: 6.8,
+            wiggleForce: 0.00065,
+            scurryRate: 9,
+            contactShake: 0.5
+        },
+        {
+            id: "shake_3",
+            label: "3",
+            name: "Shake 3",
+            bodyColor: "#4f8cff",
+            headColor: "#78a6ff",
+            earColor: "#d6e4ff",
+            strokeColor: "#1d4ed8",
+            tailColor: "#3b73d9",
+            noseColor: "#fca5a5",
+            density: 0.075,
+            friction: 0.028,
+            restitution: 0.12,
+            frictionAir: 0.004,
+            radiusScale: 1.04,
+            colliderScale: 0.64,
+            impactKick: 0.75,
+            clearRadiusScale: 1,
+            clearCorrection: 0.56,
+            clearImpulse: 0.46,
+            stuckSpeed: 0.34,
+            phaseAfter: 0.62,
+            phaseDuration: 0.38,
+            phaseFallSpeed: 255,
+            dropSpeed: 6.8,
+            wiggleForce: 0.00065,
+            scurryRate: 9,
+            contactShake: 0.75
+        },
+        {
+            id: "shake_4",
+            label: "4",
+            name: "Shake 4",
+            bodyColor: "#2dd4bf",
+            headColor: "#5eead4",
+            earColor: "#ccfbf1",
+            strokeColor: "#0f766e",
+            tailColor: "#14b8a6",
+            noseColor: "#f472b6",
+            density: 0.075,
+            friction: 0.028,
+            restitution: 0.12,
+            frictionAir: 0.004,
+            radiusScale: 1.04,
+            colliderScale: 0.64,
+            impactKick: 0.75,
+            clearRadiusScale: 1,
+            clearCorrection: 0.56,
+            clearImpulse: 0.46,
+            stuckSpeed: 0.34,
+            phaseAfter: 0.62,
+            phaseDuration: 0.38,
+            phaseFallSpeed: 255,
+            dropSpeed: 6.8,
+            wiggleForce: 0.00065,
+            scurryRate: 9,
+            contactShake: 1
+        },
+        {
+            id: "shake_5",
+            label: "5",
+            name: "Shake 5",
+            bodyColor: "#ff8c42",
+            headColor: "#ffa864",
+            earColor: "#ffd7ba",
+            strokeColor: "#8a3c08",
+            tailColor: "#de6f27",
+            noseColor: "#fff176",
+            density: 0.075,
+            friction: 0.028,
+            restitution: 0.12,
+            frictionAir: 0.004,
+            radiusScale: 1.04,
+            colliderScale: 0.64,
+            impactKick: 0.75,
+            clearRadiusScale: 1,
+            clearCorrection: 0.56,
+            clearImpulse: 0.46,
+            stuckSpeed: 0.34,
+            phaseAfter: 0.62,
+            phaseDuration: 0.38,
+            phaseFallSpeed: 255,
+            dropSpeed: 6.8,
+            wiggleForce: 0.00065,
+            scurryRate: 9,
+            contactShake: 1.25
+        },
         {
             id: "soft",
             label: "A",
@@ -376,6 +521,7 @@
     let debugEggSpawned = false;
     let mouseLabSpawnIndex = 0;
     let mouseLabCupSeeded = false;
+    let mouseLabSettleTimer = 0;
     let totalDropsThisSession = 0;
     let cupLeftWall = null;
     let cupRightWall = null;
@@ -547,6 +693,7 @@
                     const catB = bodyB.gameObject;
 
                     if (catA.isGoldenBall || catB.isGoldenBall || catA.isMouse || catB.isMouse) return;
+                    if (DEBUG_MOUSE_LAB) return;
 
                     if (catA.level === catB.level && !catA.isMerged && !catB.isMerged && catA.isDropped && catB.isDropped) {
                         if (mergingBodyIds.has(bodyA.id) || mergingBodyIds.has(bodyB.id)) return;
@@ -766,6 +913,25 @@
         return 1;
     }
 
+    function applyMouseContactShake(mouse, cat, side, strength) {
+        const shake = mouseParam(mouse, "contactShake", 0);
+        if (shake <= 0 || !cat || cat.isMouse || cat.isGoldenBall || !cat.isDropped) return;
+
+        const now = performance.now();
+        const cooldown = mouseParam(mouse, "contactShakeCooldown", 0.13) * 1000;
+        if (cat.lastMouseShakeAt && now - cat.lastMouseShakeAt < cooldown) return;
+        cat.lastMouseShakeAt = now;
+
+        const lift = (0.9 + strength * 1.55) * shake;
+        const sideways = (0.25 + strength * 0.55) * shake * side;
+        Body.setVelocity(cat.body, {
+            x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + sideways)),
+            y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y - lift))
+        });
+        Body.setAngularVelocity(cat.body, cat.body.angularVelocity + side * (0.035 + strength * 0.03) * shake);
+        triggerWobble(cat, 5 + shake * 4 + strength * 2);
+    }
+
     /**
      * One-shot impact cue on first contact. The real anti-stuck separation is
      * applyMousePhaseClearance(); this only makes the first touch feel alive.
@@ -789,6 +955,7 @@
             x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + nx * kick)),
             y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, ny) * kick * 0.6))
         });
+        applyMouseContactShake(mouse, cat, Math.abs(nx) > 0.1 ? Math.sign(nx) : (mx < cx ? 1 : -1), 1);
 
         if (!mouse.squeaked) {
             mouse.squeaked = true;
@@ -835,6 +1002,7 @@
                 y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, dy / dist) * impulse * 0.04))
             });
             Body.setAngularVelocity(cat.body, cat.body.angularVelocity + side * (0.012 + strength * 0.025));
+            applyMouseContactShake(mouse, cat, side, strength);
             if (strength > 0.55) triggerWobble(cat, 2.5 + strength * 3);
         });
     }
@@ -1134,6 +1302,19 @@
         spawnDebugUltimatePair();
     }
 
+    function calmMouseLabCup(delta) {
+        if (!DEBUG_MOUSE_LAB || mouseLabSettleTimer <= 0) return;
+        mouseLabSettleTimer = Math.max(0, mouseLabSettleTimer - delta);
+        activeCats.forEach(cat => {
+            if (!cat.isDropped || cat.isMouse) return;
+            Body.setVelocity(cat.body, {
+                x: cat.body.velocity.x * 0.74,
+                y: cat.body.velocity.y * 0.82
+            });
+            Body.setAngularVelocity(cat.body, cat.body.angularVelocity * 0.62);
+        });
+    }
+
     function spawnMergedCat(x, y, level, specialType) {
         const radius = GameState.get_radius(level);
         const colliderR = radius * CatPhysics.COLLIDER_RADIUS_SCALE;
@@ -1175,30 +1356,32 @@
         mouseLabCupSeeded = true;
 
         const labCats = [
-            { x: 160, y: 1048, level: 7, angle: -0.18 },
-            { x: 290, y: 1044, level: 5, angle: 0.12 },
-            { x: 420, y: 1042, level: 8, angle: -0.08 },
-            { x: 552, y: 1046, level: 4, angle: 0.2 },
-            { x: 220, y: 962, level: 3, angle: 0.16 },
-            { x: 350, y: 944, level: 6, angle: -0.22 },
-            { x: 482, y: 958, level: 2, angle: 0.1 },
-            { x: 164, y: 878, level: 4, angle: -0.1 },
-            { x: 292, y: 850, level: 1, angle: 0.2 },
-            { x: 424, y: 860, level: 7, angle: -0.14 },
-            { x: 548, y: 884, level: 3, angle: 0.08 },
-            { x: 246, y: 780, level: 5, angle: -0.18 },
-            { x: 382, y: 760, level: 2, angle: 0.12 },
-            { x: 514, y: 792, level: 6, angle: -0.08 },
-            { x: 126, y: 996, level: 2, angle: 0.22 },
-            { x: 612, y: 998, level: 2, angle: -0.2 },
-            { x: 110, y: 920, level: 1, angle: -0.12 },
-            { x: 606, y: 930, level: 1, angle: 0.18 },
-            { x: 196, y: 705, level: 3, angle: 0.1 },
-            { x: 320, y: 690, level: 4, angle: -0.16 },
-            { x: 450, y: 705, level: 3, angle: 0.14 },
-            { x: 565, y: 735, level: 2, angle: -0.08 },
-            { x: 145, y: 805, level: 2, angle: 0.18 },
-            { x: 610, y: 815, level: 2, angle: -0.18 }
+            { x: 125, y: 1053, level: 3, angle: -0.14 },
+            { x: 220, y: 1062, level: 2, angle: 0.1 },
+            { x: 320, y: 1043, level: 4, angle: -0.08 },
+            { x: 435, y: 1062, level: 2, angle: 0.12 },
+            { x: 535, y: 1053, level: 3, angle: -0.1 },
+            { x: 610, y: 1072, level: 1, angle: 0.08 },
+            { x: 150, y: 984, level: 2, angle: 0.14 },
+            { x: 245, y: 970, level: 3, angle: -0.18 },
+            { x: 355, y: 984, level: 2, angle: 0.08 },
+            { x: 465, y: 955, level: 4, angle: -0.12 },
+            { x: 575, y: 984, level: 2, angle: 0.16 },
+            { x: 115, y: 908, level: 1, angle: -0.08 },
+            { x: 195, y: 900, level: 3, angle: 0.18 },
+            { x: 305, y: 918, level: 2, angle: -0.12 },
+            { x: 405, y: 898, level: 3, angle: 0.08 },
+            { x: 515, y: 918, level: 2, angle: -0.16 },
+            { x: 600, y: 908, level: 1, angle: 0.14 },
+            { x: 155, y: 830, level: 2, angle: 0.12 },
+            { x: 255, y: 835, level: 1, angle: -0.14 },
+            { x: 345, y: 815, level: 3, angle: 0.16 },
+            { x: 460, y: 830, level: 2, angle: -0.1 },
+            { x: 565, y: 835, level: 1, angle: 0.08 },
+            { x: 210, y: 765, level: 1, angle: -0.16 },
+            { x: 305, y: 745, level: 2, angle: 0.1 },
+            { x: 410, y: 765, level: 1, angle: -0.08 },
+            { x: 520, y: 745, level: 2, angle: 0.14 }
         ];
 
         labCats.forEach(spec => {
@@ -1213,7 +1396,8 @@
         });
 
         totalDropsThisSession = Math.max(totalDropsThisSession, 80);
-        spawnFloatingText(360, 330, "MOUSE LAB C E H", "#ffffff");
+        mouseLabSettleTimer = 0.65;
+        spawnFloatingText(360, 330, "MOUSE SHAKE 1-5", "#ffffff");
     }
 
     function getSpawnSpecFromCat(cat) {
@@ -1371,6 +1555,7 @@
         totalDropsThisSession++;
 
         if (cat.isMouse) {
+            mouseLabSettleTimer = 0;
             resetMouseEscapeState(cat, true);
             cat.squeaked = false;
             Body.setVelocity(cat.body, { x: 0, y: mouseParam(cat, "dropSpeed", 7.0) });
@@ -2419,6 +2604,7 @@
             updateChaosTilt(delta);
             Engine.update(engine, 1000 / 60);
             clampAllCatsInCup();
+            calmMouseLabCup(delta);
             updateMice(delta);
             updateDevPeekEffect(delta);
         }
