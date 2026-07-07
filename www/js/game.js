@@ -1191,16 +1191,6 @@
             });
         }
 
-        // Плавное затухание вращения (угловой скорости) котика,
-        // чтобы предотвратить бесконечное кручение вокруг своей оси в углах
-        const restingOnFloor = y >= maxY - 1.5 && speed < CatPhysics.RESTING_LINEAR_SPEED;
-        if (restingOnFloor && Math.abs(cat.body.angularVelocity) < CatPhysics.RESTING_ANGULAR_SPEED) {
-            Body.setAngularVelocity(cat.body, 0);
-        } else {
-            const damping = restingOnFloor ? CatPhysics.RESTING_ANGULAR_DAMPING : 0.94;
-            Body.setAngularVelocity(cat.body, cat.body.angularVelocity * damping);
-        }
-
     }
 
     function clampAllCatsInCup() {

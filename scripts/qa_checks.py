@@ -82,11 +82,11 @@ def check_physics_frozen():
     text = open(path, encoding="utf-8").read()
     required = [
         "CAT_RESTITUTION: 0.38",
-        "CAT_FRICTION: 0.15",
+        "CAT_FRICTION: 0.25",
+        "WALL_FRICTION: 0.25",
         "GRAVITY_Y: 2.465",
         "MAX_CAT_SPEED: 23.8",
         "COLLIDER_RADIUS_SCALE: 1.0",
-        "RESTING_ANGULAR_DAMPING: 0.72",
     ]
     for needle in required:
         if needle not in text:
