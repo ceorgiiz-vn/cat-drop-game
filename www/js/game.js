@@ -136,41 +136,28 @@
     const mergingBodyIds = new Set();
     const CHAOS_TILT_RAD = Math.PI / 8; // ~22.5° — proportional cup teeter, not sideways magnet
     const MOUSE_RADIUS = 22 * GameState.CAT_SIZE_SCALE;
-    const MOUSE_STUCK_SPEED = 0.42;
-    const MOUSE_PHASE_AFTER = 0.45;
-    const MOUSE_PHASE_DURATION = 0.42;
-    const MOUSE_PHASE_FALL_SPEED = 250;
-    const MOUSE_PHASE_CLEAR_RADIUS = MOUSE_RADIUS * 1.12;
     /** TEMP: spawn two lvl-11 cats for easter-egg testing — set false before release */
     const DEBUG_ULTIMATE_EGG_TEST = false;
     const FINAL_MOUSE_TUNING = {
-        bodyColor: "#ff8c42",
-        headColor: "#ffa864",
+        bodyColor: "#8d6e63",
+        headColor: "#a98272",
         earColor: "#ffd7ba",
-        strokeColor: "#8a3c08",
-        tailColor: "#de6f27",
-        noseColor: "#fff176",
-        density: 0.075,
-        friction: 0.028,
-        restitution: 0.12,
-        frictionAir: 0.004,
-        radiusScale: 1.04,
-        colliderScale: 0.64,
-        clearRadiusScale: 1,
-        stuckSpeed: 0.34,
-        phaseAfter: 0.62,
-        phaseDuration: 0.38,
-        phaseFallSpeed: 255,
-        dropSpeed: 6.8,
-        wiggleForce: 0.00065,
-        scurryRate: 9,
-        contactShake: 2.8,
-        contactForce: 0.00145,
-        contactLiftForce: 0.00055,
-        phaseForce: 0.0028,
-        phaseLiftForce: 0.00095,
-        impactForce: 0.0022,
-        influenceDecay: 5.2
+        strokeColor: "#4e342e",
+        tailColor: "#7b5a4e",
+        noseColor: "#f48fb1",
+        bootColor: "#3b2418",
+        swordColor: "#dce7ff",
+        swordGlow: "#8fd3ff",
+        hatColor: "#5d4037",
+        featherColor: "#f9c74f",
+        density: 0.01,
+        friction: 0.02,
+        restitution: 0.02,
+        frictionAir: 0.001,
+        radiusScale: 1.0,
+        colliderScale: 0.46,
+        dropSpeed: 9.2,
+        swordReach: 1.82
     };
     let debugEggSpawned = false;
     let totalDropsThisSession = 0;
@@ -317,11 +304,10 @@
                     const catA = bodyA.gameObject;
                     const catB = bodyB.gameObject;
 
-                    if (catA.isMouse && catB.isDropped && !catB.isMouse && !catB.isGoldenBall) {
-                        applyMousePush(catA, catB, true);
-                    }
-                    if (catB.isMouse && catA.isDropped && !catA.isMouse && !catA.isGoldenBall) {
-                        applyMousePush(catB, catA, true);
+                    if (catA.isMouse || catB.isMouse) {
+                        const mouse = catA.isMouse ? catA : catB;
+                        const target = catA.isMouse ? catB : catA;
+                        if (tryPierceMouseTarget(mouse, target)) return;
                     }
 
                     if (catA.isGoldenBall && !catB.isGoldenBall && !catB.isMouse) {
@@ -396,9 +382,7 @@
             });
         });
 
-        // Mouse/cat separation is handled once per frame by applyMousePressureField()
-        // only while the mouse briefly phases out of a real stuck state.
-        // collisionStart only adds the first squeak and a tiny impact cue.
+        // Sword mouse hits are one-shot pierces; it never pushes the stack around.
     }
 
     function normalizeSpawn(spec) {
@@ -485,7 +469,7 @@
             restitution: mouseParam(null, "restitution", 0.22),
             frictionAir: mouseParam(null, "frictionAir", 0.0025),
             density: mouseParam(null, "density", 0.05),
-            isSensor: false,
+            isSensor: true,
             isStatic: !isDropped,
             label: "mouse",
             sleepThreshold: Infinity
@@ -503,9 +487,6 @@
             isMerged: false,
             isEscaping: isDropped,
             scurryPhase: Math.random() * Math.PI * 2,
-            stuckTime: 0,
-            phaseTimer: 0,
-            isPhasing: false,
             squeaked: false,
             deathZoneTime: 0,
             spawnScale: isDropped ? 1.0 : 0.0,
@@ -525,180 +506,118 @@
 
     function resetMouseEscapeState(mouse, escaping) {
         mouse.isEscaping = escaping;
-        mouse.stuckTime = 0;
-        mouse.phaseTimer = 0;
-        mouse.isPhasing = false;
-        mouse.body.isSensor = false;
-    }
-
-    function getCatHeavyBoost(cat) {
-        if (cat.level >= 8) return 1.55;
-        if (cat.level >= 6) return 1.42;
-        if (cat.level >= 4) return 1.25;
-        if (cat.level >= 2) return 1.1;
-        return 1;
-    }
-
-    function updateMouseInfluenceMarks(delta) {
-        const decay = mouseParam(null, "influenceDecay", 5);
-        activeCats.forEach(cat => {
-            if (!cat.mouseInfluence) return;
-            cat.mouseInfluence = Math.max(0, cat.mouseInfluence - delta * decay);
-            if (cat.mouseInfluence <= 0.001) {
-                cat.mouseInfluence = 0;
-                cat.lastMouseWobbleAt = 0;
-            }
-        });
-    }
-
-    function applyMousePressure(mouse, cat, side, strength, mode, delta) {
-        const shake = mouseParam(mouse, "contactShake", 0);
-        if (shake <= 0 || !cat || cat.isMouse || cat.isGoldenBall || !cat.isDropped || cat.isMerged) return;
-
-        const clampedStrength = Math.max(0, Math.min(1, strength));
-        const previousInfluence = cat.mouseInfluence || 0;
-        const repeatedContactScale = Math.max(0.42, 1 - previousInfluence * 0.32);
-        const timeScale = Math.max(0.5, Math.min(1.5, delta / (1 / 60)));
-        const heavy = getCatHeavyBoost(cat);
-        const massScale = cat.body.mass / heavy;
-
-        const horizontalKey = mode === "phase" ? "phaseForce" : (mode === "impact" ? "impactForce" : "contactForce");
-        const verticalKey = mode === "phase" ? "phaseLiftForce" : "contactLiftForce";
-        const horizontal = mouseParam(mouse, horizontalKey, 0.0014) * shake * (0.45 + clampedStrength * 0.9);
-        const lift = mouseParam(mouse, verticalKey, 0.00045) * shake * clampedStrength;
-
-        Body.applyForce(cat.body, cat.body.position, {
-            x: side * horizontal * massScale * repeatedContactScale * timeScale,
-            y: -lift * massScale * repeatedContactScale * timeScale
-        });
-
-        cat.mouseInfluence = Math.min(1.8, previousInfluence + clampedStrength * 0.2);
-
-        const now = performance.now();
-        if (!cat.lastMouseWobbleAt || now - cat.lastMouseWobbleAt > 90) {
-            cat.lastMouseWobbleAt = now;
-            triggerWobble(cat, 2.5 + shake * 2.2 * clampedStrength);
-        }
-    }
-
-    /**
-     * Mouse pressure is local and temporary: it applies force to the touched cat,
-     * then normal cat collisions carry that motion through the stack.
-     */
-    function applyMousePush(mouse, cat, isImpact) {
-        if (!mouse.isMouse || !mouse.isDropped || !cat.isDropped || cat.isMouse || cat.isGoldenBall) return;
-        if (!isImpact) return;
-
-        const mx = mouse.body.position.x;
-        const my = mouse.body.position.y;
-        const cx = cat.body.position.x;
-        const cy = cat.body.position.y;
-        const dx = cx - mx;
-        const dy = cy - my;
-        const dist = Math.hypot(dx, dy) || 0.01;
-        const nx = dx / dist;
-        const ny = dy / dist;
-
-        applyMousePressure(mouse, cat, Math.abs(nx) > 0.1 ? Math.sign(nx) : (mx < cx ? 1 : -1), 1, "impact", 1 / 60);
-
-        if (!mouse.squeaked) {
-            mouse.squeaked = true;
-            playMergeSound(1.45);
-            spawnFloatingText(mx, my - 20, "Squeak!", FINAL_MOUSE_TUNING.bodyColor || "#f48fb1");
-        }
-    }
-
-    function applyMousePressureField(mouse, delta, isPhasing) {
-        const mx = mouse.body.position.x;
-        const my = mouse.body.position.y;
-        const phaseR = MOUSE_PHASE_CLEAR_RADIUS * mouseParam(mouse, "clearRadiusScale", 1);
-
-        activeCats.forEach(cat => {
-            if (cat.isMouse || !cat.isDropped || cat.isMerged) return;
-
-            const dx = cat.body.position.x - mx;
-            const dy = cat.body.position.y - my;
-            const dist = Math.hypot(dx, dy) || 0.01;
-            const catR = getCatColliderRadius(cat);
-            const reach = phaseR + catR;
-            if (dist > reach) return;
-
-            const overlap = reach - dist;
-            if (overlap <= 0.15) return;
-
-            const strength = Math.min(1, overlap / Math.max(1, reach * 0.5));
-            let side = Math.abs(dx) > 3 ? Math.sign(dx) : (mx < (LEFT_LIMIT + RIGHT_LIMIT) / 2 ? 1 : -1);
-            const sideRoom = side > 0
-                ? RIGHT_LIMIT - cat.radius - cat.body.position.x
-                : cat.body.position.x - (LEFT_LIMIT + cat.radius);
-            if (sideRoom < 8) side *= -1;
-
-            const pressureStrength = isPhasing ? strength : strength * 0.55;
-            applyMousePressure(mouse, cat, side, pressureStrength, isPhasing ? "phase" : "contact", delta);
-        });
+        mouse.body.isSensor = true;
     }
 
     function getMouseFaceAngle(mouse) {
         if (!mouse.isDropped) return Math.PI;
-        const vel = mouse.body.velocity;
-        const speed = Math.hypot(vel.x, vel.y);
-        if (speed < 0.25) return Math.PI;
-        return Math.atan2(vel.y, vel.x) + Math.PI / 2;
+        return Math.PI;
+    }
+
+    function distancePointToSegment(px, py, ax, ay, bx, by) {
+        const vx = bx - ax;
+        const vy = by - ay;
+        const wx = px - ax;
+        const wy = py - ay;
+        const len2 = vx * vx + vy * vy;
+        const t = len2 > 0 ? Math.max(0, Math.min(1, (wx * vx + wy * vy) / len2)) : 0;
+        const sx = ax + vx * t;
+        const sy = ay + vy * t;
+        return Math.hypot(px - sx, py - sy);
+    }
+
+    function getMouseSwordSegment(mouse) {
+        const x = mouse.body.position.x;
+        const y = mouse.body.position.y;
+        const reach = mouse.radius * mouseParam(mouse, "swordReach", 1.8);
+        return {
+            ax: x,
+            ay: y + mouse.radius * 0.16,
+            bx: x,
+            by: y + reach
+        };
+    }
+
+    function createMousePopEffect(x, y, color) {
+        burstParticles(x, y, color, 24);
+        for (let i = 0; i < 18; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = Math.random() * 4.4 + 1.6;
+            particles.push({
+                x,
+                y,
+                vx: Math.cos(a) * sp,
+                vy: Math.sin(a) * sp - 1.3,
+                color: i % 3 === 0 ? "#ffffff" : (i % 3 === 1 ? "#8fd3ff" : color),
+                radius: Math.random() * 3.4 + 1.4,
+                alpha: 0.95,
+                life: 0.85
+            });
+        }
+        shakeCamera(4, 0.12);
+        spawnFloatingText(x, y - 24, "POP!", "#8fd3ff");
+        playMergeSound(1.75);
+    }
+
+    function pierceCatWithMouse(mouse, cat) {
+        if (!mouse || !cat || mouse.isRemoved || cat.isMouse || !cat.isDropped || cat.isMerged) return false;
+
+        mouse.isRemoved = true;
+        cat.isMerged = true;
+
+        const x = cat.body.position.x;
+        const y = cat.body.position.y;
+        const color = cat.isGoldenBall ? "#ffd54f" : GameState.get_color(Math.min(cat.level || 1, 11));
+
+        Composite.remove(engine.world, cat.body);
+        Composite.remove(engine.world, mouse.body);
+        activeCats = activeCats.filter(c => c !== cat && c !== mouse);
+
+        createMousePopEffect(x, y, color);
+        saveGameSession();
+        return true;
+    }
+
+    function tryPierceMouseTarget(mouse, cat) {
+        if (!mouse || !cat || !mouse.isMouse || !mouse.isDropped || !mouse.isEscaping) return false;
+        return pierceCatWithMouse(mouse, cat);
+    }
+
+    function checkMouseSwordHit(mouse) {
+        const sword = getMouseSwordSegment(mouse);
+        let hitCat = null;
+        let bestY = Infinity;
+
+        activeCats.forEach(cat => {
+            if (cat === mouse || cat.isMouse || !cat.isDropped || cat.isMerged) return;
+
+            const r = getCatColliderRadius(cat);
+            const d = distancePointToSegment(cat.body.position.x, cat.body.position.y, sword.ax, sword.ay, sword.bx, sword.by);
+            if (d > r) return;
+
+            if (cat.body.position.y < bestY) {
+                bestY = cat.body.position.y;
+                hitCat = cat;
+            }
+        });
+
+        return hitCat ? pierceCatWithMouse(mouse, hitCat) : false;
     }
 
     function updateMice(delta) {
         activeCats.filter(c => c.isMouse && c.isDropped && c.isEscaping).forEach(mouse => {
-            const dt = Math.min(delta, 0.05);
-            mouse.scurryPhase += dt * mouseParam(mouse, "scurryRate", 14);
-
             const r = getMouseColliderRadius(mouse);
             const floorY = FLOOR_TOP_Y - r;
-            const phaseFallSpeed = mouseParam(mouse, "phaseFallSpeed", MOUSE_PHASE_FALL_SPEED);
 
-            if (mouse.isPhasing) {
-                mouse.phaseTimer -= dt;
-
-                const prevX = mouse.body.position.x;
-                const prevY = mouse.body.position.y;
-                const drift = mouseParam(mouse, "driftAmplitude", 0.55);
-                const x = getClampedX(prevX + Math.sin(mouse.scurryPhase * 0.6) * drift, mouse.radius);
-                const y = Math.min(floorY, prevY + phaseFallSpeed * dt);
-
-                Body.setPosition(mouse.body, { x, y });
-                Body.setVelocity(mouse.body, { x: x - prevX, y: Math.max(1.8, y - prevY) });
-                Body.setAngularVelocity(mouse.body, Math.sin(mouse.scurryPhase) * 0.045);
-                applyMousePressureField(mouse, dt, true);
-
-                if (mouse.phaseTimer <= 0 || y >= floorY - 1) {
-                    mouse.isPhasing = false;
-                    mouse.phaseTimer = 0;
-                    mouse.stuckTime = 0;
-                    mouse.body.isSensor = false;
-                }
-            } else {
-                const wiggle = Math.sin(mouse.scurryPhase) * mouseParam(mouse, "wiggleForce", 0.0012) * mouse.body.mass;
-                Body.applyForce(mouse.body, mouse.body.position, { x: wiggle, y: 0 });
-                applyMousePressureField(mouse, dt, false);
-
-                const speed = Math.hypot(mouse.body.velocity.x, mouse.body.velocity.y);
-                if (speed < mouseParam(mouse, "stuckSpeed", MOUSE_STUCK_SPEED) && mouse.body.position.y < floorY - 4) {
-                    mouse.stuckTime += dt;
-                } else {
-                    mouse.stuckTime = Math.max(0, mouse.stuckTime - dt * 1.8);
-                }
-
-                if (mouse.stuckTime >= mouseParam(mouse, "phaseAfter", MOUSE_PHASE_AFTER)) {
-                    mouse.isPhasing = true;
-                    mouse.phaseTimer = mouseParam(mouse, "phaseDuration", MOUSE_PHASE_DURATION);
-                    mouse.body.isSensor = true;
-                    Body.setVelocity(mouse.body, {
-                        x: mouse.body.velocity.x * 0.25,
-                        y: Math.max(2.2, mouse.body.velocity.y)
-                    });
-                }
-            }
+            Body.setVelocity(mouse.body, {
+                x: mouse.body.velocity.x * 0.9,
+                y: Math.max(mouseParam(mouse, "dropSpeed", 8.8), mouse.body.velocity.y)
+            });
+            Body.setAngularVelocity(mouse.body, 0);
 
             clampCatInCup(mouse);
+
+            if (checkMouseSwordHit(mouse)) return;
 
             if (mouse.body.position.y >= floorY - 1) {
                 poofRemoveMouse(mouse);
@@ -1122,6 +1041,7 @@
             resetMouseEscapeState(cat, true);
             cat.squeaked = false;
             Body.setVelocity(cat.body, { x: 0, y: mouseParam(cat, "dropSpeed", 7.0) });
+            Body.setAngularVelocity(cat.body, 0);
         }
 
         World.add(engine.world, cat.body);
@@ -2151,7 +2071,6 @@
             updateChaosTilt(delta);
             Engine.update(engine, 1000 / 60);
             clampAllCatsInCup();
-            updateMouseInfluenceMarks(delta);
             updateMice(delta);
             updateDevPeekEffect(delta);
         }

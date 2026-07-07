@@ -86,7 +86,7 @@ def check_physics_frozen():
         "WALL_FRICTION: 0.25",
         "GRAVITY_Y: 2.465",
         "MAX_CAT_SPEED: 23.8",
-        "COLLIDER_RADIUS_SCALE: 0.98",
+        "COLLIDER_RADIUS_SCALE: 1.0",
     ]
     for needle in required:
         if needle not in text:

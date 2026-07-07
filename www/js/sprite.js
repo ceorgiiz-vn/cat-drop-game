@@ -102,6 +102,11 @@ const CatSprite = (function() {
         const strokeColor = style && style.strokeColor ? style.strokeColor : "#757575";
         const tailColor = style && style.tailColor ? style.tailColor : "#8d8d8d";
         const noseColor = style && style.noseColor ? style.noseColor : "#f48fb1";
+        const bootColor = style && style.bootColor ? style.bootColor : "#3b2418";
+        const swordColor = style && style.swordColor ? style.swordColor : "#dce7ff";
+        const swordGlow = style && style.swordGlow ? style.swordGlow : "#8fd3ff";
+        const hatColor = style && style.hatColor ? style.hatColor : "#5d4037";
+        const featherColor = style && style.featherColor ? style.featherColor : "#f9c74f";
 
         ctx.save();
         if (angle) ctx.rotate(angle);
@@ -157,6 +162,27 @@ const CatSprite = (function() {
         ear(-r * 0.28, -r * 0.52, -r * 0.92);
         ear(r * 0.28, r * 0.52, -r * 0.92);
 
+        // Tiny musketeer hat
+        ctx.fillStyle = hatColor;
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.78, r * 0.34, r * 0.11, -0.08, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = Math.max(1.4, r * 0.045);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.22, -r * 0.8);
+        ctx.quadraticCurveTo(0, -r * 1.04, r * 0.22, -r * 0.8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = featherColor;
+        ctx.lineWidth = Math.max(1.4, r * 0.055);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.16, -r * 0.9);
+        ctx.quadraticCurveTo(r * 0.46, -r * 1.18, r * 0.24, -r * 1.34);
+        ctx.stroke();
+
         // Eyes
         ctx.fillStyle = "#1a1a1a";
         ctx.beginPath();
@@ -185,12 +211,58 @@ const CatSprite = (function() {
             ctx.stroke();
         });
 
+        // Needle rapier and paw grip
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.strokeStyle = swordGlow;
+        ctx.globalAlpha = 0.45;
+        ctx.lineWidth = Math.max(3, r * 0.13);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.1, -r * 0.36);
+        ctx.lineTo(0, -r * 1.72);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = swordColor;
+        ctx.lineWidth = Math.max(1.6, r * 0.045);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.1, -r * 0.36);
+        ctx.lineTo(0, -r * 1.72);
+        ctx.stroke();
+        ctx.strokeStyle = "#f8fbff";
+        ctx.lineWidth = Math.max(1, r * 0.02);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.08, -r * 0.48);
+        ctx.lineTo(r * 0.01, -r * 1.55);
+        ctx.stroke();
+        ctx.strokeStyle = "#f9c74f";
+        ctx.lineWidth = Math.max(1.5, r * 0.06);
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.14, -r * 0.54);
+        ctx.lineTo(r * 0.22, -r * 0.5);
+        ctx.stroke();
+        ctx.fillStyle = earColor;
+        ctx.beginPath();
+        ctx.arc(r * 0.12, -r * 0.38, r * 0.09, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
         // Tiny paws
         ctx.fillStyle = earColor;
         [[-r * 0.35, r * 0.38], [r * 0.35, r * 0.38]].forEach(([px, py]) => {
             ctx.beginPath();
             ctx.arc(px, py, r * 0.09, 0, Math.PI * 2);
             ctx.fill();
+        });
+
+        // Boots
+        ctx.fillStyle = bootColor;
+        [[-r * 0.28, r * 0.5, -0.2], [r * 0.28, r * 0.5, 0.2]].forEach(([px, py, rot]) => {
+            ctx.beginPath();
+            ctx.ellipse(px, py, r * 0.17, r * 0.09, rot, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = Math.max(1, r * 0.035);
+            ctx.stroke();
         });
 
         ctx.restore();

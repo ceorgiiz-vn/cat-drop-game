@@ -2,7 +2,7 @@
  * Cat Drop — Matter.js physics tuning.
  * Baseline from CatDropEvolution-debug.apk; speed 2× per user request (2026-06).
  * 2026-07: fall speed reduced ~15% per user request (GRAVITY_Y / MAX_CAT_SPEED).
- * 2026-07: restored the pre-mouse cup/cat settling baseline.
+ * 2026-07: cat collider matches the drawn ball radius.
  */
 const CatPhysics = Object.freeze({
     GRAVITY_Y: 2.465,
@@ -12,7 +12,7 @@ const CatPhysics = Object.freeze({
     CAT_FRICTION: 0.25,
     CAT_RESTITUTION: 0.38,
     CAT_FRICTION_AIR: 0,
-    COLLIDER_RADIUS_SCALE: 0.98,
+    COLLIDER_RADIUS_SCALE: 1.0,
 
     WALL_FRICTION: 0.25,
     WALL_RESTITUTION: 0.18,
