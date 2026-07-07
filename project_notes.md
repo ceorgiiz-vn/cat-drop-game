@@ -1,32 +1,20 @@
-# Cat Drop: Evolution - Project Notes & Architecture
+# Cat Drop: Project Notes
 
-## Текущий статус
-- Игра представляет собой веб-приложение (HTML5, Canvas, JS, CSS) с поддержкой PWA для работы оффлайн на мобильных устройствах. Интерфейс полностью на английском языке (названия игр, меню, кнопки), так как проект англоязычный.
-- В игре присутствуют **три полноценных режима**:
-  1. **Основной режим (Suika Game):** Бросаем и объединяем круглых котиков в коробке (физика на Matter.js).
-  2. **Hungry Cats (бывший Agar.io / Cat.io):** Арена, где котик поедает точки и других ботов, чтобы расти.
-  3. **Cat Match (3-in-a-row):** Новая релакс-игра "Три-в-ряд" на поле 8x8. Добавлены сочные визуальные эффекты (Screen Shake, Particles, Floating Combo Texts).
+## Current Status
+- The app is a single HTML5 Canvas game with PWA support for offline mobile play.
+- The active gameplay is the main Cat Drop/Suika-style mode powered by Matter.js.
+- The temporary mouse test mode has been removed. The selected mouse behavior is now the normal mouse tuning in `www/js/game.js`.
+- The former side mini-games have been removed from the runtime, UI, cache list, and release checks.
 
-## Архитектура и Структура файлов
-- `index.html`: Главная разметка. Содержит меню выбора мини-игр (`minigames-overlay`) и холсты для всех трех режимов.
-- `style.css`: Глобальные стили. Установлена темная тема (`--bg-color: #141724`), все панели, оверлеи и шрифты подстроены под этот "ночной" дизайн. Модальные окна активируются добавлением класса `.active`.
-- `js/game.js`: Движок основной игры. Обработка тач-ивентов, рендер котов через Matter.js, логика слияния и начисления "рыбок".
-- `js/state.js`: Хранение прогресса (монеты, рекорды, скины) в `localStorage` с защитой `navigator.storage.persist()`.
-- `js/agario.js`: Движок Hungry Cats. ИИ ботов (убегание/преследование), слежение камеры, зум, 16 ступеней эволюции.
-- `js/match3.js`: Движок Cat Match. Рендеринг на Canvas, обработка тапов для обмена котов местами, поиск линий от 3 штук. Включает логику "Juice" (тряска экрана, разлет частиц, всплывающий текст комбо).
-- `sw.js`: Service Worker (текущая версия `v18`), кэширует спрайты, звуки и все 3 скрипта движков.
+## File Structure
+- `www/index.html`: main game markup and modals.
+- `www/style.css`: global UI and game styling.
+- `www/js/game.js`: main game controller, spawning, input, rendering, scoring, mouse behavior.
+- `www/js/physics.js`: Matter.js cup and physics constants.
+- `www/js/state.js`: local storage, coins, records, skins, active session persistence.
+- `www/js/game_modes.js`: main game modes and spawn rules.
+- `www/sw.js`: PWA service worker cache list. Bump `CACHE_NAME` whenever JS/CSS/assets change.
 
-## Последние изменения (Minigames & Juice Update)
-- **Обновление спрайта 11 уровня:** Космонавт (`cat_11.jpg`) заменен на невероятно толстого полосатого кота (табби) в костюме мыши с угарным оскалом и молочными усами. Фон спрайта — пастельно-голубой.
-- **Меню мини-игр:** Вместо отдельной кнопки добавлена общая кнопка с джойстиком (🎮), открывающая окно выбора между Hungry Cats и Cat Match.
-- **Эффекты в Cat Match (Juice):** 
-  - При взрыве линий вылетают цветные конфетти/частицы (particles).
-  - Срабатывает тряска экрана (Screen Shake), зависящая от длины линии и множителя комбо.
-  - Появляются всплывающие тексты ("GREAT!", "WOW!", "COMBO x2!").
-- **Английская локализация:** Все русскоязычные надписи в HTML и JS были переведены на английский, чтобы проект оставался целостным. (Заметка для ИИ: Общение с пользователем ведется строго на русском, а код и UI — на английском).
-
-## Точка сохранения (С чего начать в следующий раз)
-- **Идеальный UI/UX базис:** Все три игры отлично работают и переключаются без конфликтов.
-- В следующий раз можно заняться добавлением звуковых эффектов (SFX) для Cat Match (взрывы линий, мяуканье при комбо).
-- Можно связать заработок очков в мини-играх с основной валютой игры (рыбками), обновляя баланс через `state.js`.
-- Либо добавить новые бустеры/фичи в основную механику.
+## Release Notes
+- Keep the release payload focused on the main game.
+- Run `npm run check` and `npm run qa` before publishing changes.

@@ -39,8 +39,6 @@ const jsFiles = [
   "js/game_modes.js",
   "js/audio.js",
   "js/game.js",
-  "js/agario.js",
-  "js/match3.js",
   "sw.js",
 ];
 

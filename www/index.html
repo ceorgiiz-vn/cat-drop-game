@@ -13,7 +13,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png">
 
     <title>Cat Drop 2</title>
-    <link rel="stylesheet" href="style.css?v=40">
+    <link rel="stylesheet" href="style.css?v=41">
     <script src="js/telegram.js?v=1"></script>
     
     <!-- Matter.js Physics Engine -->
@@ -90,7 +90,6 @@
 
         <!-- Control modals toggles at right -->
         <div class="hud-element controls-container">
-            <button class="paper-button control-small-btn" id="minigames-btn" title="Mini-Games">🎮</button>
             <button class="paper-button control-small-btn" id="shop-btn" title="Theme/Skin/Sound Shop">🛒</button>
             <button class="paper-button control-small-btn" id="evolution-btn" title="Cat Evolution Chart">🧬</button>
             <button class="paper-button control-small-btn" id="leaderboard-btn" title="Global Leaderboard">🏆</button>
@@ -314,79 +313,6 @@
             </div>
         </div>
 
-        <!-- 8. Minigames Menu Modal -->
-        <div class="modal-overlay" id="minigames-overlay">
-            <div class="modal-panel">
-                <h2 class="modal-title">Mini-Games</h2>
-                <div class="modal-subtitle">Take a break from merging!</div>
-                
-                <div class="minigame-menu-list">
-                    <button class="paper-button minigame-menu-btn" id="play-agario-btn" type="button">
-                        <span class="minigame-menu-title">🎯 Hungry Cats</span>
-                        <span class="minigame-menu-desc">Grow by eating — dodge bigger cats</span>
-                    </button>
-                    <button class="paper-button minigame-menu-btn" id="play-match3-btn" type="button">
-                        <span class="minigame-menu-title">🧩 Cat Match</span>
-                        <span class="minigame-menu-desc">Match 3 in a row for fish coins</span>
-                    </button>
-                </div>
-
-                <button class="paper-button modal-close-btn" id="minigames-close-btn" style="margin-top:20px;">CLOSE</button>
-            </div>
-        </div>
-
-        <!-- 9. Hungry Cats Mini Game -->
-        <div class="modal-overlay minigame-overlay" id="agario-overlay">
-            <div class="minigame-shell">
-                <header class="minigame-topbar">
-                    <button class="minigame-back-btn" id="agario-close-btn" type="button" aria-label="Back to main game">
-                        <span class="minigame-back-arrow">←</span>
-                        <span>Back</span>
-                    </button>
-                    <div class="minigame-title-block">
-                        <h1 class="minigame-title">Hungry Cats</h1>
-                        <p class="minigame-subtitle">Eat dots, grow big, avoid bigger cats!</p>
-                    </div>
-                    <div class="minigame-stat-pill">
-                        Mass <strong id="agario-score">10</strong>
-                    </div>
-                </header>
-                <div class="minigame-stage" id="agario-stage">
-                    <canvas id="agario-canvas"></canvas>
-                </div>
-                <div class="minigame-gameover" id="agario-gameover">
-                    <div class="minigame-gameover-panel">
-                        <h2>You were eaten!</h2>
-                        <p class="minigame-gameover-score">Final mass: <strong id="agario-final-score">0</strong></p>
-                        <p class="minigame-gameover-reward" id="agario-reward-text"></p>
-                        <button class="paper-button minigame-action-btn" id="agario-respawn-btn" type="button">Play Again</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 10. Cat Match Mini Game -->
-        <div class="modal-overlay minigame-overlay" id="match3-overlay">
-            <div class="minigame-shell">
-                <header class="minigame-topbar">
-                    <button class="minigame-back-btn" id="match3-close-btn" type="button" aria-label="Back to main game">
-                        <span class="minigame-back-arrow">←</span>
-                        <span>Back</span>
-                    </button>
-                    <div class="minigame-title-block">
-                        <h1 class="minigame-title">Cat Match</h1>
-                        <p class="minigame-subtitle">Swap neighbors — match 3+ cats!</p>
-                    </div>
-                    <div class="minigame-stat-pill">
-                        Score <strong id="match3-score">0</strong>
-                    </div>
-                </header>
-                <div class="minigame-stage" id="match3-stage">
-                    <canvas id="match3-canvas"></canvas>
-                </div>
-            </div>
-        </div>
-
     </div><!-- /.game-wrapper -->
 
     <!-- Web Audio engine -->
@@ -396,13 +322,7 @@
     <script src="js/physics.js?v=3"></script>
 
     <!-- Core Game Controller Logic -->
-    <script src="js/game.js?v=70"></script>
-    
-    <!-- Agario Controller Logic -->
-    <script src="js/agario.js?v=3"></script>
-
-    <!-- Match-3 Controller Logic -->
-    <script src="js/match3.js?v=3"></script>
+    <script src="js/game.js?v=71"></script>
     
     <!-- Register Service Worker -->
     <script>

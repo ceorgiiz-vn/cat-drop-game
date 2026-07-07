@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v82';
+const CACHE_NAME = 'cat-drop-v83';
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',
@@ -21,8 +21,6 @@ const ASSETS_TO_CACHE = [
   './js/responsive.js',
   './js/telegram.js',
   './js/physics.js',
-  './js/agario.js',
-  './js/match3.js',
   './js/audio.js',
   './manifest.json',
   './assets/dev-cat-peek-peace.png',
