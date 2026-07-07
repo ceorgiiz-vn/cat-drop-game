@@ -163,22 +163,37 @@
     let totalDropsThisSession = 0;
     let cupLeftWall = null;
     let cupRightWall = null;
+    let cupLeftCorner = null;
+    let cupRightCorner = null;
     let cupFloor = null;
 
     const CUP_WALL_LEFT_X = 90;
     const CUP_WALL_RIGHT_X = 630;
+    const CUP_WALL_BOTTOM_Y = 1075;
+    const CUP_CORNER_LEFT_A = { x: 80, y: 1075 };
+    const CUP_CORNER_LEFT_B = { x: 110, y: 1098 };
+    const CUP_CORNER_RIGHT_A = { x: 610, y: 1098 };
+    const CUP_CORNER_RIGHT_B = { x: 640, y: 1075 };
     const CUP_FLOOR_X = 360;
     const CUP_FLOOR_Y = 1110;
     const CUP_PIVOT_X = 360;
     const CUP_PIVOT_Y = 1060; // pivot near cup base — cats roll to lower corner, not the side wall
-    // Walls end exactly where the floor begins (both at FLOOR_TOP_Y) with zero overlap —
-    // two static rectangles meeting at a perfectly coincident edge/corner is a classic
-    // 2D-physics degenerate case: a ball rolling into that exact seam gets an ambiguous
-    // contact normal (wall face vs floor face), which shows up as spinning in place,
-    // sticking, or occasionally tunnelling through right at the corner. Extending the
-    // walls a bit past the floor's top surface turns that hairline seam into solid
-    // overlapping geometry, so there's no ambiguous point left to catch on.
-    const WALL_FLOOR_OVERLAP = 26;
+    // The visual glass has chamfered bottom corners, so physics does too. A pure
+    // vertical-wall-plus-floor corner can trap a round body between two normals and
+    // keep injecting spin; the diagonal handoff lets the cat settle onto the floor.
+    const WALL_CORNER_OVERLAP = 10;
+    const CORNER_THICKNESS = 22;
+    const LEFT_CORNER_ANGLE = Math.atan2(CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y, CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x);
+    const RIGHT_CORNER_ANGLE = Math.atan2(CUP_CORNER_RIGHT_B.y - CUP_CORNER_RIGHT_A.y, CUP_CORNER_RIGHT_B.x - CUP_CORNER_RIGHT_A.x);
+    const LEFT_CORNER_CENTER = {
+        x: (CUP_CORNER_LEFT_A.x + CUP_CORNER_LEFT_B.x) / 2,
+        y: (CUP_CORNER_LEFT_A.y + CUP_CORNER_LEFT_B.y) / 2
+    };
+    const RIGHT_CORNER_CENTER = {
+        x: (CUP_CORNER_RIGHT_A.x + CUP_CORNER_RIGHT_B.x) / 2,
+        y: (CUP_CORNER_RIGHT_A.y + CUP_CORNER_RIGHT_B.y) / 2
+    };
+    const CORNER_LENGTH = Math.hypot(CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x, CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y) + 18;
 
     function rotatePoint(px, py, angle) {
         const dx = px - CUP_PIVOT_X;
@@ -203,18 +218,24 @@
     }
 
     function updateCupBoundaries(angle) {
-        if (!cupLeftWall || !cupRightWall || !cupFloor) return;
-        const wallHeight = FLOOR_TOP_Y - CUP_PHYSICS_TOP_Y + WALL_FLOOR_OVERLAP;
+        if (!cupLeftWall || !cupRightWall || !cupLeftCorner || !cupRightCorner || !cupFloor) return;
+        const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_CORNER_OVERLAP;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
 
         const leftPos = rotatePoint(CUP_WALL_LEFT_X, wallCenterY, angle);
         const rightPos = rotatePoint(CUP_WALL_RIGHT_X, wallCenterY, angle);
+        const leftCornerPos = rotatePoint(LEFT_CORNER_CENTER.x, LEFT_CORNER_CENTER.y, angle);
+        const rightCornerPos = rotatePoint(RIGHT_CORNER_CENTER.x, RIGHT_CORNER_CENTER.y, angle);
         const floorPos = rotatePoint(CUP_FLOOR_X, CUP_FLOOR_Y, angle);
 
         Body.setPosition(cupLeftWall, leftPos);
         Body.setAngle(cupLeftWall, angle);
         Body.setPosition(cupRightWall, rightPos);
         Body.setAngle(cupRightWall, angle);
+        Body.setPosition(cupLeftCorner, leftCornerPos);
+        Body.setAngle(cupLeftCorner, LEFT_CORNER_ANGLE + angle);
+        Body.setPosition(cupRightCorner, rightCornerPos);
+        Body.setAngle(cupRightCorner, RIGHT_CORNER_ANGLE + angle);
         Body.setPosition(cupFloor, floorPos);
         Body.setAngle(cupFloor, angle);
     }
@@ -266,9 +287,9 @@
             velocityIterations: CatPhysics.VELOCITY_ITERATIONS
         });
 
-        // Rigid boundaries — inner faces at x=80 / x=640; walls extend above visual rim so
-        // dropped cats slide in without bouncing off the top corner at y=CUP_RIM_Y.
-        const wallHeight = FLOOR_TOP_Y - CUP_PHYSICS_TOP_Y + WALL_FLOOR_OVERLAP;
+        // Rigid boundaries follow the drawn glass: vertical sides hand off to
+        // sloped bottom corners instead of forming a spin-prone 90-degree trap.
+        const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_CORNER_OVERLAP;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
         cupLeftWall = Bodies.rectangle(CUP_WALL_LEFT_X, wallCenterY, 20, wallHeight, { 
             isStatic: true, 
@@ -280,13 +301,25 @@
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
         });
+        cupLeftCorner = Bodies.rectangle(LEFT_CORNER_CENTER.x, LEFT_CORNER_CENTER.y, CORNER_LENGTH, CORNER_THICKNESS, {
+            isStatic: true,
+            angle: LEFT_CORNER_ANGLE,
+            friction: CatPhysics.WALL_FRICTION,
+            restitution: CatPhysics.WALL_RESTITUTION
+        });
+        cupRightCorner = Bodies.rectangle(RIGHT_CORNER_CENTER.x, RIGHT_CORNER_CENTER.y, CORNER_LENGTH, CORNER_THICKNESS, {
+            isStatic: true,
+            angle: RIGHT_CORNER_ANGLE,
+            friction: CatPhysics.WALL_FRICTION,
+            restitution: CatPhysics.WALL_RESTITUTION
+        });
         cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, 560, 20, { 
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
         });
 
-        World.add(engine.world, [cupLeftWall, cupRightWall, cupFloor]);
+        World.add(engine.world, [cupLeftWall, cupRightWall, cupLeftCorner, cupRightCorner, cupFloor]);
         updateCupBoundaries(cupTiltAngle);
         applyCupGravity();
 
