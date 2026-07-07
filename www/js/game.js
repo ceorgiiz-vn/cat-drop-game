@@ -2564,12 +2564,17 @@
         spawnFloatingText(360, 400, "Name Saved!", "#ffd700");
     }
 
-    // --- Leaderboard system (Google Sheets API fetch/post compatibility) ---
+    // --- Leaderboard system (Google Sheets API fetch/post compatibility & GPGS) ---
     function submitScore() {
         if (!GameState.player_name) return;
 
-        // Submit to local mock storage
+        // Submit to local mock storage for web
         submitScoreToMockLeaderboard();
+
+        // Submit to Google Play Games Services natively
+        if (window.PlayGames) {
+            window.PlayGames.submitScore('CgkIxxxxxxxxxxx', GameState.highscore);
+        }
 
         // If real URL is configured, POST to it
         if (GameState.google_sheets_url) {
@@ -3147,9 +3152,14 @@
         };
 
         // Leaderboard Overlay
-        document.getElementById("leaderboard-btn").onclick = () => {
+        document.getElementById("leaderboard-btn").onclick = async () => {
+            playClickSound();
+            if (window.PlayGames) {
+                const shown = await window.PlayGames.showLeaderboard('CgkIxxxxxxxxxxx');
+                if (shown) return;
+            }
             switchLeaderboardTab("alltime");
-            populateLeaderboardOverlay();
+            populateLeaderboardOverlay(true);
             openModal(document.getElementById("leaderboard-overlay"));
         };
         document.getElementById("leaderboard-close-btn").onclick = () => {
@@ -3212,6 +3222,18 @@
 
     // --- Game Engine Startup Sequence ---
     window.addEventListener("load", () => {
+        if (window.PlayGames) window.PlayGames.init();
+        
+        window.addEventListener("modalClosedViaBackButton", () => {
+            if (typeof pendingGameOver !== "undefined" && !pendingGameOver && typeof isTargetingEraser !== "undefined" && !isTargetingEraser) {
+                isModalOpen = false;
+                canDrop = true;
+            }
+        });
+        window.addEventListener("cancelEraserViaBackButton", () => {
+            isTargetingEraser = false;
+            updateTargetingUI();
+        });
         let imagesReady = false;
         let audioReady = false;
         let gameBooted = false;
