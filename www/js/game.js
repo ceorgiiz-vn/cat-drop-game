@@ -156,10 +156,7 @@
         frictionAir: 0.004,
         radiusScale: 1.04,
         colliderScale: 0.64,
-        impactKick: 0.75,
         clearRadiusScale: 1,
-        clearCorrection: 0.56,
-        clearImpulse: 0.46,
         stuckSpeed: 0.34,
         phaseAfter: 0.62,
         phaseDuration: 0.38,
@@ -168,7 +165,12 @@
         wiggleForce: 0.00065,
         scurryRate: 9,
         contactShake: 2.8,
-        chainShakeReach: 104
+        contactForce: 0.00145,
+        contactLiftForce: 0.00055,
+        phaseForce: 0.0028,
+        phaseLiftForce: 0.00095,
+        impactForce: 0.0022,
+        influenceDecay: 5.2
     };
     let debugEggSpawned = false;
     let totalDropsThisSession = 0;
@@ -394,7 +396,7 @@
             });
         });
 
-        // Mouse/cat separation is handled once per frame by applyMousePhaseClearance()
+        // Mouse/cat separation is handled once per frame by applyMousePressureField()
         // only while the mouse briefly phases out of a real stuck state.
         // collisionStart only adds the first squeak and a tiny impact cue.
     }
@@ -537,54 +539,51 @@
         return 1;
     }
 
-    function applyMouseContactShake(mouse, cat, side, strength) {
-        const shake = mouseParam(mouse, "contactShake", 0);
-        if (shake <= 0 || !cat || cat.isMouse || cat.isGoldenBall || !cat.isDropped) return;
-
-        const now = performance.now();
-        const cooldown = mouseParam(mouse, "contactShakeCooldown", 0.13) * 1000;
-        if (cat.lastMouseShakeAt && now - cat.lastMouseShakeAt < cooldown) return;
-        cat.lastMouseShakeAt = now;
-
-        const lift = (0.9 + strength * 1.55) * shake;
-        const sideways = (0.25 + strength * 0.55) * shake * side;
-        Body.setVelocity(cat.body, {
-            x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + sideways)),
-            y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y - lift))
-        });
-        Body.setAngularVelocity(cat.body, cat.body.angularVelocity + side * (0.035 + strength * 0.03) * shake);
-        triggerWobble(cat, 5 + shake * 4 + strength * 2);
-
-        const reachPad = mouseParam(mouse, "chainShakeReach", 60);
-        activeCats.forEach(other => {
-            if (other === cat || other.isMouse || other.isGoldenBall || !other.isDropped || other.isMerged) return;
-            if (other.lastMouseChainShakeAt && now - other.lastMouseChainShakeAt < cooldown) return;
-
-            const dx = other.body.position.x - cat.body.position.x;
-            const dy = other.body.position.y - cat.body.position.y;
-            const dist = Math.hypot(dx, dy) || 0.01;
-            const reach = getCatColliderRadius(cat) + getCatColliderRadius(other) + reachPad;
-            if (dist > reach) return;
-
-            const falloff = Math.pow(1 - dist / reach, 1.35);
-            if (falloff <= 0.02) return;
-            other.lastMouseChainShakeAt = now;
-
-            const nudgeSide = Math.abs(dx) > 2 ? Math.sign(dx) : side;
-            const chainLift = lift * 0.62 * falloff;
-            const chainSide = (sideways * 0.45 + nudgeSide * shake * 0.18) * falloff;
-            Body.setVelocity(other.body, {
-                x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, other.body.velocity.x + chainSide)),
-                y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, other.body.velocity.y - chainLift))
-            });
-            Body.setAngularVelocity(other.body, other.body.angularVelocity + nudgeSide * (0.018 + strength * 0.018) * shake * falloff);
-            if (falloff > 0.18) triggerWobble(other, 3 + shake * 3 * falloff);
+    function updateMouseInfluenceMarks(delta) {
+        const decay = mouseParam(null, "influenceDecay", 5);
+        activeCats.forEach(cat => {
+            if (!cat.mouseInfluence) return;
+            cat.mouseInfluence = Math.max(0, cat.mouseInfluence - delta * decay);
+            if (cat.mouseInfluence <= 0.001) {
+                cat.mouseInfluence = 0;
+                cat.lastMouseWobbleAt = 0;
+            }
         });
     }
 
+    function applyMousePressure(mouse, cat, side, strength, mode, delta) {
+        const shake = mouseParam(mouse, "contactShake", 0);
+        if (shake <= 0 || !cat || cat.isMouse || cat.isGoldenBall || !cat.isDropped || cat.isMerged) return;
+
+        const clampedStrength = Math.max(0, Math.min(1, strength));
+        const previousInfluence = cat.mouseInfluence || 0;
+        const repeatedContactScale = Math.max(0.42, 1 - previousInfluence * 0.32);
+        const timeScale = Math.max(0.5, Math.min(1.5, delta / (1 / 60)));
+        const heavy = getCatHeavyBoost(cat);
+        const massScale = cat.body.mass / heavy;
+
+        const horizontalKey = mode === "phase" ? "phaseForce" : (mode === "impact" ? "impactForce" : "contactForce");
+        const verticalKey = mode === "phase" ? "phaseLiftForce" : "contactLiftForce";
+        const horizontal = mouseParam(mouse, horizontalKey, 0.0014) * shake * (0.45 + clampedStrength * 0.9);
+        const lift = mouseParam(mouse, verticalKey, 0.00045) * shake * clampedStrength;
+
+        Body.applyForce(cat.body, cat.body.position, {
+            x: side * horizontal * massScale * repeatedContactScale * timeScale,
+            y: -lift * massScale * repeatedContactScale * timeScale
+        });
+
+        cat.mouseInfluence = Math.min(1.8, previousInfluence + clampedStrength * 0.2);
+
+        const now = performance.now();
+        if (!cat.lastMouseWobbleAt || now - cat.lastMouseWobbleAt > 90) {
+            cat.lastMouseWobbleAt = now;
+            triggerWobble(cat, 2.5 + shake * 2.2 * clampedStrength);
+        }
+    }
+
     /**
-     * One-shot impact cue on first contact. The real anti-stuck separation is
-     * applyMousePhaseClearance(); this only makes the first touch feel alive.
+     * Mouse pressure is local and temporary: it applies force to the touched cat,
+     * then normal cat collisions carry that motion through the stack.
      */
     function applyMousePush(mouse, cat, isImpact) {
         if (!mouse.isMouse || !mouse.isDropped || !cat.isDropped || cat.isMouse || cat.isGoldenBall) return;
@@ -600,12 +599,7 @@
         const nx = dx / dist;
         const ny = dy / dist;
 
-        const kick = mouseParam(mouse, "impactKick", 1.6);
-        Body.setVelocity(cat.body, {
-            x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + nx * kick)),
-            y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, ny) * kick * 0.6))
-        });
-        applyMouseContactShake(mouse, cat, Math.abs(nx) > 0.1 ? Math.sign(nx) : (mx < cx ? 1 : -1), 1);
+        applyMousePressure(mouse, cat, Math.abs(nx) > 0.1 ? Math.sign(nx) : (mx < cx ? 1 : -1), 1, "impact", 1 / 60);
 
         if (!mouse.squeaked) {
             mouse.squeaked = true;
@@ -614,7 +608,7 @@
         }
     }
 
-    function applyMousePhaseClearance(mouse) {
+    function applyMousePressureField(mouse, delta, isPhasing) {
         const mx = mouse.body.position.x;
         const my = mouse.body.position.y;
         const phaseR = MOUSE_PHASE_CLEAR_RADIUS * mouseParam(mouse, "clearRadiusScale", 1);
@@ -633,27 +627,14 @@
             if (overlap <= 0.15) return;
 
             const strength = Math.min(1, overlap / Math.max(1, reach * 0.5));
-            const heavy = getCatHeavyBoost(cat);
             let side = Math.abs(dx) > 3 ? Math.sign(dx) : (mx < (LEFT_LIMIT + RIGHT_LIMIT) / 2 ? 1 : -1);
             const sideRoom = side > 0
                 ? RIGHT_LIMIT - cat.radius - cat.body.position.x
                 : cat.body.position.x - (LEFT_LIMIT + cat.radius);
             if (sideRoom < 8) side *= -1;
 
-            const correction = Math.min(2.4, (0.45 + overlap * 0.045) * Math.min(heavy, 1.25) * mouseParam(mouse, "clearCorrection", 1));
-            const yNudge = dy < -catR * 0.25 ? -correction * 0.08 : Math.min(0.7, correction * 0.08);
-            const targetX = getClampedX(cat.body.position.x + side * correction, cat.radius);
-            const targetY = Math.min(FLOOR_TOP_Y - catR, cat.body.position.y + yNudge);
-            Body.setPosition(cat.body, { x: targetX, y: targetY });
-
-            const impulse = (0.45 + strength * 1.15) * Math.min(heavy, 1.25) * mouseParam(mouse, "clearImpulse", 1);
-            Body.setVelocity(cat.body, {
-                x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + side * impulse)),
-                y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, dy / dist) * impulse * 0.04))
-            });
-            Body.setAngularVelocity(cat.body, cat.body.angularVelocity + side * (0.012 + strength * 0.025));
-            applyMouseContactShake(mouse, cat, side, strength);
-            if (strength > 0.55) triggerWobble(cat, 2.5 + strength * 3);
+            const pressureStrength = isPhasing ? strength : strength * 0.55;
+            applyMousePressure(mouse, cat, side, pressureStrength, isPhasing ? "phase" : "contact", delta);
         });
     }
 
@@ -686,7 +667,7 @@
                 Body.setPosition(mouse.body, { x, y });
                 Body.setVelocity(mouse.body, { x: x - prevX, y: Math.max(1.8, y - prevY) });
                 Body.setAngularVelocity(mouse.body, Math.sin(mouse.scurryPhase) * 0.045);
-                applyMousePhaseClearance(mouse);
+                applyMousePressureField(mouse, dt, true);
 
                 if (mouse.phaseTimer <= 0 || y >= floorY - 1) {
                     mouse.isPhasing = false;
@@ -697,6 +678,7 @@
             } else {
                 const wiggle = Math.sin(mouse.scurryPhase) * mouseParam(mouse, "wiggleForce", 0.0012) * mouse.body.mass;
                 Body.applyForce(mouse.body, mouse.body.position, { x: wiggle, y: 0 });
+                applyMousePressureField(mouse, dt, false);
 
                 const speed = Math.hypot(mouse.body.velocity.x, mouse.body.velocity.y);
                 if (speed < mouseParam(mouse, "stuckSpeed", MOUSE_STUCK_SPEED) && mouse.body.position.y < floorY - 4) {
@@ -1165,44 +1147,6 @@
         return cat.radius * CatPhysics.COLLIDER_RADIUS_SCALE;
     }
 
-    function isCatSupportedInStack(cat, radius, floorY) {
-        const pos = cat.body.position;
-        if (pos.y >= floorY - CatPhysics.STACK_SUPPORT_MARGIN) return true;
-
-        for (const other of activeCats) {
-            if (other === cat || !other.isDropped || other.body.isStatic || other.isMouse) continue;
-            const otherRadius = getCatColliderRadius(other);
-            const dx = other.body.position.x - pos.x;
-            const dy = other.body.position.y - pos.y;
-            if (dy <= 2) continue;
-
-            const contactReach = radius + otherRadius + CatPhysics.STACK_SUPPORT_MARGIN;
-            if (dx * dx + dy * dy <= contactReach * contactReach) return true;
-        }
-
-        return false;
-    }
-
-    function settleSupportedCat(cat, radius, floorY) {
-        if (cat.isMouse || cat.isGoldenBall || Math.abs(cupTiltAngle) > 0.02) return;
-        if (shakeDuration > 0) return;
-
-        const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
-        const angSpeed = Math.abs(cat.body.angularVelocity);
-        const supported = isCatSupportedInStack(cat, radius, floorY);
-        if (!supported || speed > CatPhysics.STACK_SETTLE_LINEAR_SPEED || angSpeed > CatPhysics.STACK_SETTLE_ANGULAR_SPEED) return;
-
-        const vx = cat.body.velocity.x * CatPhysics.STACK_SETTLE_LINEAR_DAMPING;
-        const vy = cat.body.velocity.y * CatPhysics.STACK_SETTLE_LINEAR_DAMPING;
-        Body.setVelocity(cat.body, {
-            x: Math.abs(vx) < CatPhysics.STACK_SETTLE_STOP_LINEAR_SPEED ? 0 : vx,
-            y: Math.abs(vy) < CatPhysics.STACK_SETTLE_STOP_LINEAR_SPEED ? 0 : vy
-        });
-
-        const av = cat.body.angularVelocity * CatPhysics.STACK_SETTLE_ANGULAR_DAMPING;
-        Body.setAngularVelocity(cat.body, Math.abs(av) < CatPhysics.STACK_SETTLE_STOP_ANGULAR_SPEED ? 0 : av);
-    }
-
     function clampCatInCup(cat) {
         if (!cat.isDropped || cat.body.isStatic) return;
 
@@ -1257,7 +1201,6 @@
             Body.setAngularVelocity(cat.body, cat.body.angularVelocity * damping);
         }
 
-        settleSupportedCat(cat, r, maxY);
     }
 
     function clampAllCatsInCup() {
@@ -2218,6 +2161,7 @@
             updateChaosTilt(delta);
             Engine.update(engine, 1000 / 60);
             clampAllCatsInCup();
+            updateMouseInfluenceMarks(delta);
             updateMice(delta);
             updateDevPeekEffect(delta);
         }
