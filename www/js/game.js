@@ -1356,32 +1356,42 @@
         mouseLabCupSeeded = true;
 
         const labCats = [
-            { x: 125, y: 1053, level: 3, angle: -0.14 },
-            { x: 220, y: 1062, level: 2, angle: 0.1 },
-            { x: 320, y: 1043, level: 4, angle: -0.08 },
-            { x: 435, y: 1062, level: 2, angle: 0.12 },
-            { x: 535, y: 1053, level: 3, angle: -0.1 },
-            { x: 610, y: 1072, level: 1, angle: 0.08 },
-            { x: 150, y: 984, level: 2, angle: 0.14 },
-            { x: 245, y: 970, level: 3, angle: -0.18 },
-            { x: 355, y: 984, level: 2, angle: 0.08 },
-            { x: 465, y: 955, level: 4, angle: -0.12 },
-            { x: 575, y: 984, level: 2, angle: 0.16 },
-            { x: 115, y: 908, level: 1, angle: -0.08 },
-            { x: 195, y: 900, level: 3, angle: 0.18 },
-            { x: 305, y: 918, level: 2, angle: -0.12 },
-            { x: 405, y: 898, level: 3, angle: 0.08 },
-            { x: 515, y: 918, level: 2, angle: -0.16 },
-            { x: 600, y: 908, level: 1, angle: 0.14 },
-            { x: 155, y: 830, level: 2, angle: 0.12 },
-            { x: 255, y: 835, level: 1, angle: -0.14 },
-            { x: 345, y: 815, level: 3, angle: 0.16 },
-            { x: 460, y: 830, level: 2, angle: -0.1 },
-            { x: 565, y: 835, level: 1, angle: 0.08 },
-            { x: 210, y: 765, level: 1, angle: -0.16 },
-            { x: 305, y: 745, level: 2, angle: 0.1 },
-            { x: 410, y: 765, level: 1, angle: -0.08 },
-            { x: 520, y: 745, level: 2, angle: 0.14 }
+            { x: 175, y: 1014, level: 7, angle: -0.14 },
+            { x: 360, y: 1018, level: 8, angle: 0.09 },
+            { x: 545, y: 1014, level: 7, angle: 0.13 },
+            { x: 108, y: 1046, level: 3, angle: 0.12 },
+            { x: 612, y: 1046, level: 3, angle: -0.12 },
+            { x: 155, y: 915, level: 6, angle: 0.16 },
+            { x: 330, y: 908, level: 7, angle: -0.1 },
+            { x: 505, y: 915, level: 6, angle: 0.08 },
+            { x: 610, y: 928, level: 2, angle: -0.18 },
+            { x: 115, y: 824, level: 4, angle: -0.12 },
+            { x: 245, y: 808, level: 5, angle: 0.14 },
+            { x: 378, y: 820, level: 5, angle: -0.08 },
+            { x: 515, y: 808, level: 5, angle: 0.16 },
+            { x: 612, y: 824, level: 2, angle: 0.1 },
+            { x: 166, y: 710, level: 6, angle: 0.08 },
+            { x: 340, y: 704, level: 7, angle: -0.16 },
+            { x: 516, y: 710, level: 6, angle: 0.12 },
+            { x: 104, y: 636, level: 3, angle: -0.08 },
+            { x: 225, y: 612, level: 5, angle: 0.14 },
+            { x: 360, y: 612, level: 5, angle: -0.12 },
+            { x: 495, y: 612, level: 5, angle: 0.1 },
+            { x: 616, y: 636, level: 3, angle: -0.16 },
+            { x: 150, y: 510, level: 4, angle: 0.12 },
+            { x: 275, y: 500, level: 4, angle: -0.08 },
+            { x: 400, y: 500, level: 4, angle: 0.16 },
+            { x: 530, y: 510, level: 4, angle: -0.14 },
+            { x: 102, y: 420, level: 2, angle: 0.08 },
+            { x: 205, y: 400, level: 3, angle: -0.16 },
+            { x: 315, y: 390, level: 4, angle: 0.12 },
+            { x: 435, y: 400, level: 3, angle: -0.1 },
+            { x: 545, y: 420, level: 2, angle: 0.14 },
+            { x: 150, y: 330, level: 1, angle: -0.12 },
+            { x: 250, y: 325, level: 2, angle: 0.1 },
+            { x: 360, y: 322, level: 2, angle: -0.08 },
+            { x: 470, y: 325, level: 2, angle: 0.16 },
+            { x: 570, y: 330, level: 1, angle: -0.14 }
         ];
 
         labCats.forEach(spec => {
@@ -1396,7 +1406,7 @@
         });
 
         totalDropsThisSession = Math.max(totalDropsThisSession, 80);
-        mouseLabSettleTimer = 0.65;
+        mouseLabSettleTimer = 0.95;
         spawnFloatingText(360, 330, "MOUSE SHAKE 1-5", "#ffffff");
     }
 
