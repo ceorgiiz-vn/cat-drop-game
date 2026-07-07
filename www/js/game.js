@@ -145,6 +145,7 @@
     const DEBUG_ULTIMATE_EGG_TEST = false;
     /** TEMP: mouse behavior lab — remove after choosing the final mouse */
     const DEBUG_MOUSE_LAB = true;
+    const MOUSE_LAB_ACTIVE_VARIANTS = ["heavy", "ghost", "drop"];
     const MOUSE_LAB_VARIANTS = [
         {
             id: "soft",
@@ -622,7 +623,11 @@
     }
 
     function getMouseLabSpawnSpec() {
-        const variant = MOUSE_LAB_VARIANTS[mouseLabSpawnIndex % MOUSE_LAB_VARIANTS.length];
+        const activeVariants = MOUSE_LAB_ACTIVE_VARIANTS
+            .map(id => getMouseLabVariant(id))
+            .filter(Boolean);
+        const queue = activeVariants.length ? activeVariants : MOUSE_LAB_VARIANTS;
+        const variant = queue[mouseLabSpawnIndex % queue.length];
         mouseLabSpawnIndex++;
         return {
             level: GameModes.MOUSE_LEVEL,
@@ -1183,7 +1188,17 @@
             { x: 548, y: 884, level: 3, angle: 0.08 },
             { x: 246, y: 780, level: 5, angle: -0.18 },
             { x: 382, y: 760, level: 2, angle: 0.12 },
-            { x: 514, y: 792, level: 6, angle: -0.08 }
+            { x: 514, y: 792, level: 6, angle: -0.08 },
+            { x: 126, y: 996, level: 2, angle: 0.22 },
+            { x: 612, y: 998, level: 2, angle: -0.2 },
+            { x: 110, y: 920, level: 1, angle: -0.12 },
+            { x: 606, y: 930, level: 1, angle: 0.18 },
+            { x: 196, y: 705, level: 3, angle: 0.1 },
+            { x: 320, y: 690, level: 4, angle: -0.16 },
+            { x: 450, y: 705, level: 3, angle: 0.14 },
+            { x: 565, y: 735, level: 2, angle: -0.08 },
+            { x: 145, y: 805, level: 2, angle: 0.18 },
+            { x: 610, y: 815, level: 2, angle: -0.18 }
         ];
 
         labCats.forEach(spec => {
@@ -1198,7 +1213,7 @@
         });
 
         totalDropsThisSession = Math.max(totalDropsThisSession, 80);
-        spawnFloatingText(360, 330, "MOUSE LAB A-H", "#ffffff");
+        spawnFloatingText(360, 330, "MOUSE LAB C E H", "#ffffff");
     }
 
     function getSpawnSpecFromCat(cat) {
