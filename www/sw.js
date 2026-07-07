@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v91';
+const CACHE_NAME = 'cat-drop-v92'; // bumped: sprites added, bug fixes
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',
@@ -8,6 +8,15 @@ const AUDIO_FILES = [
   'drop_vampire.wav', 'merge_vampire.wav', 'game_over_vampire.wav',
   'drop_oldman.wav', 'merge_oldman.wav', 'game_over_oldman.wav',
 ].map(f => './assets/audio/' + f);
+
+const SPRITE_FILES = [
+  ...Array.from({length: 11}, (_, i) => `./assets/sprites/cat_${i+1}.png`),
+  './assets/sprites/skin_rapper.png',
+  './assets/sprites/skin_zombie.png',
+  './assets/sprites/skin_vampire.png',
+  './assets/sprites/skin_bard.png',
+  './assets/sprites/skin_oldman.png',
+];
 
 const ASSETS_TO_CACHE = [
   './',
@@ -26,7 +35,8 @@ const ASSETS_TO_CACHE = [
   './assets/dev-cat-peek-peace.png',
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',
-  ...AUDIO_FILES
+  ...AUDIO_FILES,
+  ...SPRITE_FILES  // BUG-008 fix: кэшируем спрайты при установке — игра работает оффлайн
 ];
 
 self.addEventListener('install', event => {

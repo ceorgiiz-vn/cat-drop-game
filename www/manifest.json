@@ -1,6 +1,6 @@
 {
-  "name": "Cat Drop 2",
-  "short_name": "Cat Drop 2",
+  "name": "Cat Drop: Evolution",
+  "short_name": "Cat Drop",
   "description": "Drop and merge kawaii cats to reach the ultimate Space Cat!",
   "start_url": "index.html",
   "display": "standalone",
@@ -12,13 +12,26 @@
       "src": "assets/app-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "assets/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "assets/app-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "assets/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
+

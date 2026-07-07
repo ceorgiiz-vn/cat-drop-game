@@ -1,4 +1,4 @@
-﻿// Cat Drop: Evolution - Core Game Logic
+// Cat Drop: Evolution - Core Game Logic
 
 (function() {
     // Canvas & Graphics Context
@@ -37,6 +37,7 @@
     let lastUndoSnapshot = null;
     let pendingGameOver = false;
     let pendingGameOverScore = 0;
+    let lastDayCheck = 0; // throttle for resetTodayIfNeeded
 
     // Screen Shake variables
     let shakeIntensity = 0;
@@ -131,8 +132,8 @@
     const FLOOR_TOP_Y = 1100;
     const mergingBodyIds = new Set();
     const MOUSE_RADIUS = 22 * GameState.CAT_SIZE_SCALE;
-    const BOOSTER_SHAKE_COST = 1000;
-    const BOOSTER_POP_COST = 2500;
+    const BOOSTER_SHAKE_COST = 5000;
+    const BOOSTER_POP_COST = 12000;
     /** TEMP: spawn two lvl-11 cats for easter-egg testing — set false before release */
     const DEBUG_ULTIMATE_EGG_TEST = false;
     const FINAL_MOUSE_TUNING = {
@@ -596,7 +597,8 @@
     }
 
     function updateMice(delta) {
-        activeCats.filter(c => c.isMouse && c.isDropped && c.isEscaping).forEach(mouse => {
+        // BUG-006 fix: guard against isRemoved to prevent access to already-detached body
+        activeCats.filter(c => c.isMouse && c.isDropped && c.isEscaping && !c.isRemoved).forEach(mouse => {
             const r = getMouseColliderRadius(mouse);
             const floorY = FLOOR_TOP_Y - r;
 
@@ -1035,6 +1037,11 @@
             });
         }
 
+        // BUG-016 fix: угловое демпфирование только для котиков, не для мышей
+        // Предотвращает бесконечное кручение в углах стакана
+        if (!cat.isMouse) {
+            Body.setAngularVelocity(cat.body, cat.body.angularVelocity * 0.94);
+        }
     }
 
     function clampAllCatsInCup() {
@@ -1842,7 +1849,12 @@
     function updateHUD() {
         applyHudNum(document.getElementById("score-val"), GameState.score);
         applyHudNum(document.getElementById("highscore-val"), GameState.highscore);
-        GameState.resetTodayIfNeeded();
+        // BUG-009 fix: throttle date check — не вызываем new Date() 60 раз в секунду
+        const nowMs = Date.now();
+        if (nowMs - lastDayCheck > 30000) {
+            GameState.resetTodayIfNeeded();
+            lastDayCheck = nowMs;
+        }
         applyHudNum(document.getElementById("today-val"), GameState.today_best);
         applyHudNum(document.getElementById("year-val"), GameState.year_best);
         applyHudNum(document.getElementById("coin-val"), GameState.fish_coins);
@@ -2195,7 +2207,11 @@
 
             if (clickedCat) {
                 isTargetingEraser = false;
-                GameState.addFishCoins(-BOOSTER_POP_COST);
+                // BUG-001/005 fix: используем spendFishCoins с проверкой баланса
+                if (!GameState.spendFishCoins(BOOSTER_POP_COST)) {
+                    updateTargetingUI();
+                    return;
+                }
 
                 // Burst particles
                 triggerMergeEffects(clickedCat.body.position.x, clickedCat.body.position.y, clickedCat.level);
@@ -2411,8 +2427,9 @@
     }
 
     function useYarnBall() {
-        if (GameState.fish_coins < BOOSTER_SHAKE_COST || isTargetingEraser) return;
-        GameState.addFishCoins(-BOOSTER_SHAKE_COST);
+        if (isTargetingEraser) return;
+        // BUG-001 fix: используем spendFishCoins с атомарной проверкой баланса
+        if (!GameState.spendFishCoins(BOOSTER_SHAKE_COST)) return;
         playMergeSound(1.2);
         spawnFloatingText(360, 500, `-${BOOSTER_SHAKE_COST} 🐟 SHAKE!`, "#ffd700");
 
@@ -2538,6 +2555,7 @@
         let name = input.value.trim();
         if (!name) {
             name = "Player_" + Math.floor(1000 + Math.random() * 9000);
+            input.value = name; // BUG-012 fix: показываем сгенерированное имя игроку
         }
         GameState.setPlayerName(name);
         updatePlayerChip();
@@ -2557,7 +2575,8 @@
         if (GameState.google_sheets_url) {
             const data = {
                 name: GameState.player_name,
-                score: GameState.score
+                // BUG-011 fix: отправляем highscore, а не текущий счёт сессии
+                score: GameState.highscore
             };
             fetch(GameState.google_sheets_url, {
                 method: "POST",
@@ -2739,10 +2758,10 @@
         if (currentShopTab === "Themes") {
             const themePrices = {
                 "Indigo Night": 0,
-                "Violet Night": 100,
-                "Forest Night": 350,
-                "Rose Night": 750,
-                "Charcoal Night": 1500
+                "Violet Night": 5000,
+                "Forest Night": 9000,
+                "Rose Night": 16000,
+                "Charcoal Night": 28000
             };
 
             THEMES.forEach(tName => {
@@ -2790,11 +2809,11 @@
 
         } else if (currentShopTab === "Skins") {
             const premiumSkins = {
-                "Rapper": { name: "Rapper Cat", cost: 500, desc: "Cool gold cat sphere" },
-                "Zombie": { name: "Zombie Cat", cost: 400, desc: "Cozy green stitch sphere" },
-                "Vampire": { name: "Vampire Cat", cost: 750, desc: "Noble dark fangs sphere" },
-                "Bard": { name: "Mustached Bard", cost: 1100, desc: "Cozy amber feather sphere" },
-                "Oldman": { name: "Old Man Cat", cost: 1600, desc: "Grumpy grey grandpa in purple sphere" }
+                "Rapper": { name: "Rapper Cat", cost: 5500, desc: "Cool gold cat sphere" },
+                "Zombie": { name: "Zombie Cat", cost: 7000, desc: "Cozy green stitch sphere" },
+                "Vampire": { name: "Vampire Cat", cost: 12000, desc: "Noble dark fangs sphere" },
+                "Bard": { name: "Mustached Bard", cost: 19000, desc: "Cozy amber feather sphere" },
+                "Oldman": { name: "Old Man Cat", cost: 28000, desc: "Grumpy grey grandpa in purple sphere" }
             };
 
             const skinsOrder = ["Rapper", "Zombie", "Vampire", "Bard", "Oldman"];
@@ -2857,11 +2876,11 @@
 
         } else if (currentShopTab === "Sounds") {
             const soundSets = {
-                "Mystic": { name: "Halloween Sound Set", cost: 1500, desc: "Owl hoots, witch chimes & spooky loop" },
-                "Rapper": { name: "Rapper Sound Set", cost: 1500, desc: "Vinyl scratches, boom-bap beat & hi-hats" },
-                "Zombie": { name: "Zombie Sound Set", cost: 1500, desc: "Guttural groans & shambling horror march" },
-                "Vampire": { name: "Vampire Sound Set", cost: 1500, desc: "Gothic \"Boo!\", organ stabs & dark waltz" },
-                "Oldman": { name: "Oldman Sound Set", cost: 1500, desc: "Grumpy coughs & nostalgic music-box waltz" }
+                "Mystic": { name: "Halloween Sound Set", cost: 10000, desc: "Owl hoots, witch chimes & spooky loop" },
+                "Rapper": { name: "Rapper Sound Set", cost: 10000, desc: "Vinyl scratches, boom-bap beat & hi-hats" },
+                "Zombie": { name: "Zombie Sound Set", cost: 10000, desc: "Guttural groans & shambling horror march" },
+                "Vampire": { name: "Vampire Sound Set", cost: 10000, desc: "Gothic \"Boo!\", organ stabs & dark waltz" },
+                "Oldman": { name: "Oldman Sound Set", cost: 10000, desc: "Grumpy coughs & nostalgic music-box waltz" }
             };
 
             // Render default sounds first
