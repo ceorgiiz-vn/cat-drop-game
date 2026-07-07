@@ -178,8 +178,8 @@
     let cupRightWall = null;
     let cupFloor = null;
 
-    const CUP_WALL_LEFT_X = LEFT_LIMIT - 10;
-    const CUP_WALL_RIGHT_X = RIGHT_LIMIT + 10;
+    const CUP_WALL_LEFT_X = 90;
+    const CUP_WALL_RIGHT_X = 630;
     const CUP_FLOOR_X = 360;
     const CUP_FLOOR_Y = 1110;
     const CUP_PIVOT_X = 360;
