@@ -92,10 +92,16 @@ const CatSprite = (function() {
     }
 
     /** Cartoon mouse — head at −Y, tail at +Y. Use angle π so head points down (falling). */
-    function drawMouse(ctx, radius, time, angle) {
+    function drawMouse(ctx, radius, time, angle, style) {
         const r = radius;
         const t = time || 0;
         const tailWag = Math.sin(t * 0.022) * 0.55;
+        const bodyColor = style && style.bodyColor ? style.bodyColor : "#b0b0b0";
+        const headColor = style && style.headColor ? style.headColor : "#a8a8a8";
+        const earColor = style && style.earColor ? style.earColor : "#f48fb1";
+        const strokeColor = style && style.strokeColor ? style.strokeColor : "#757575";
+        const tailColor = style && style.tailColor ? style.tailColor : "#8d8d8d";
+        const noseColor = style && style.noseColor ? style.noseColor : "#f48fb1";
 
         ctx.save();
         if (angle) ctx.rotate(angle);
@@ -108,23 +114,23 @@ const CatSprite = (function() {
         ctx.moveTo(0, 0);
         ctx.quadraticCurveTo(r * 0.35, r * 0.45, r * 0.15, r * 1.05);
         ctx.quadraticCurveTo(-r * 0.1, r * 1.35, -r * 0.05, r * 1.65);
-        ctx.strokeStyle = "#8d8d8d";
+        ctx.strokeStyle = tailColor;
         ctx.lineWidth = Math.max(2.5, r * 0.14);
         ctx.lineCap = "round";
         ctx.stroke();
         ctx.restore();
 
         // Body
-        ctx.fillStyle = "#b0b0b0";
+        ctx.fillStyle = bodyColor;
         ctx.beginPath();
         ctx.ellipse(0, r * 0.08, r * 0.62, r * 0.48, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "#757575";
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = Math.max(1.5, r * 0.05);
         ctx.stroke();
 
         // Head
-        ctx.fillStyle = "#a8a8a8";
+        ctx.fillStyle = headColor;
         ctx.beginPath();
         ctx.arc(0, -r * 0.38, r * 0.38, 0, Math.PI * 2);
         ctx.fill();
@@ -132,7 +138,7 @@ const CatSprite = (function() {
 
         // Ears
         function ear(ex, tipX, tipY) {
-            ctx.fillStyle = "#a8a8a8";
+            ctx.fillStyle = headColor;
             ctx.beginPath();
             ctx.moveTo(ex, -r * 0.55);
             ctx.lineTo(tipX, tipY);
@@ -140,7 +146,7 @@ const CatSprite = (function() {
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            ctx.fillStyle = "#f48fb1";
+            ctx.fillStyle = earColor;
             ctx.beginPath();
             ctx.moveTo(ex, -r * 0.52);
             ctx.lineTo(tipX * 0.85, tipY * 0.85);
@@ -164,7 +170,7 @@ const CatSprite = (function() {
         ctx.fill();
 
         // Nose & whiskers
-        ctx.fillStyle = "#f48fb1";
+        ctx.fillStyle = noseColor;
         ctx.beginPath();
         ctx.arc(0, -r * 0.28, r * 0.06, 0, Math.PI * 2);
         ctx.fill();
@@ -180,7 +186,7 @@ const CatSprite = (function() {
         });
 
         // Tiny paws
-        ctx.fillStyle = "#f48fb1";
+        ctx.fillStyle = earColor;
         [[-r * 0.35, r * 0.38], [r * 0.35, r * 0.38]].forEach(([px, py]) => {
             ctx.beginPath();
             ctx.arc(px, py, r * 0.09, 0, Math.PI * 2);
@@ -188,6 +194,20 @@ const CatSprite = (function() {
         });
 
         ctx.restore();
+
+        if (style && style.label) {
+            ctx.save();
+            ctx.fillStyle = "rgba(16, 18, 28, 0.82)";
+            ctx.beginPath();
+            ctx.arc(0, r * 0.08, r * 0.24, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.font = `bold ${Math.floor(r * 0.33)}px 'Nunito', sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(style.label, 0, r * 0.09);
+            ctx.restore();
+        }
     }
 
     function drawSpecialRing(ctx, radius, special, time) {
@@ -219,12 +239,12 @@ const CatSprite = (function() {
         }
     }
 
-    function renderMousePreview(canvas, diameter, fitScale = 0.9) {
+    function renderMousePreview(canvas, diameter, fitScale = 0.9, style) {
         const displayD = previewDisplayD(canvas, diameter);
         const ctx = setupPreviewCanvas(canvas, displayD);
         ctx.save();
         ctx.translate(displayD / 2, displayD / 2);
-        drawMouse(ctx, (displayD / 2) * fitScale, Date.now(), Math.PI);
+        drawMouse(ctx, (displayD / 2) * fitScale, Date.now(), Math.PI, style);
         ctx.restore();
     }
 

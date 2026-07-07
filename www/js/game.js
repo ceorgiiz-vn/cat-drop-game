@@ -143,7 +143,238 @@
     const MOUSE_PHASE_CLEAR_RADIUS = MOUSE_RADIUS * 1.12;
     /** TEMP: spawn two lvl-11 cats for easter-egg testing — set false before release */
     const DEBUG_ULTIMATE_EGG_TEST = false;
+    /** TEMP: mouse behavior lab — remove after choosing the final mouse */
+    const DEBUG_MOUSE_LAB = true;
+    const MOUSE_LAB_VARIANTS = [
+        {
+            id: "soft",
+            label: "A",
+            name: "Soft",
+            bodyColor: "#ff7aa8",
+            headColor: "#ff95bb",
+            earColor: "#ffd1df",
+            strokeColor: "#a83362",
+            tailColor: "#ff8fb3",
+            noseColor: "#ffe35d",
+            density: 0.048,
+            friction: 0.018,
+            restitution: 0.2,
+            frictionAir: 0.003,
+            radiusScale: 1,
+            colliderScale: 0.62,
+            impactKick: 1.25,
+            clearRadiusScale: 1.05,
+            clearCorrection: 0.9,
+            clearImpulse: 0.85,
+            stuckSpeed: 0.38,
+            phaseAfter: 0.55,
+            phaseDuration: 0.34,
+            phaseFallSpeed: 225,
+            dropSpeed: 6.4,
+            wiggleForce: 0.00085,
+            scurryRate: 11
+        },
+        {
+            id: "needle",
+            label: "B",
+            name: "Needle",
+            bodyColor: "#5ee7ff",
+            headColor: "#8ef1ff",
+            earColor: "#d7fbff",
+            strokeColor: "#116b86",
+            tailColor: "#41c7e6",
+            noseColor: "#ff6f91",
+            density: 0.038,
+            friction: 0.012,
+            restitution: 0.16,
+            frictionAir: 0.0018,
+            radiusScale: 0.94,
+            colliderScale: 0.54,
+            impactKick: 0.9,
+            clearRadiusScale: 0.96,
+            clearCorrection: 0.62,
+            clearImpulse: 0.58,
+            stuckSpeed: 0.48,
+            phaseAfter: 0.32,
+            phaseDuration: 0.5,
+            phaseFallSpeed: 290,
+            dropSpeed: 7.4,
+            wiggleForce: 0.00055,
+            scurryRate: 13
+        },
+        {
+            id: "heavy",
+            label: "C",
+            name: "Heavy",
+            bodyColor: "#ffd166",
+            headColor: "#ffe08a",
+            earColor: "#fff0ba",
+            strokeColor: "#8a5d00",
+            tailColor: "#d99b24",
+            noseColor: "#ef476f",
+            density: 0.075,
+            friction: 0.028,
+            restitution: 0.12,
+            frictionAir: 0.004,
+            radiusScale: 1.04,
+            colliderScale: 0.64,
+            impactKick: 1.1,
+            clearRadiusScale: 1,
+            clearCorrection: 0.72,
+            clearImpulse: 0.68,
+            stuckSpeed: 0.34,
+            phaseAfter: 0.62,
+            phaseDuration: 0.38,
+            phaseFallSpeed: 255,
+            dropSpeed: 6.8,
+            wiggleForce: 0.00065,
+            scurryRate: 9
+        },
+        {
+            id: "bounce",
+            label: "D",
+            name: "Bounce",
+            bodyColor: "#9cff57",
+            headColor: "#b7ff7f",
+            earColor: "#e5ffd4",
+            strokeColor: "#3d7b13",
+            tailColor: "#77d936",
+            noseColor: "#ff5f7e",
+            density: 0.045,
+            friction: 0.01,
+            restitution: 0.38,
+            frictionAir: 0.0022,
+            radiusScale: 0.98,
+            colliderScale: 0.6,
+            impactKick: 1.55,
+            clearRadiusScale: 1.02,
+            clearCorrection: 0.8,
+            clearImpulse: 0.95,
+            stuckSpeed: 0.46,
+            phaseAfter: 0.42,
+            phaseDuration: 0.34,
+            phaseFallSpeed: 245,
+            dropSpeed: 7.2,
+            wiggleForce: 0.00135,
+            scurryRate: 16
+        },
+        {
+            id: "ghost",
+            label: "E",
+            name: "Ghost",
+            bodyColor: "#b388ff",
+            headColor: "#c8a8ff",
+            earColor: "#eadcff",
+            strokeColor: "#5b3b9a",
+            tailColor: "#a177ed",
+            noseColor: "#ffdf6b",
+            density: 0.04,
+            friction: 0.008,
+            restitution: 0.18,
+            frictionAir: 0.0015,
+            radiusScale: 0.96,
+            colliderScale: 0.5,
+            impactKick: 0.65,
+            clearRadiusScale: 0.9,
+            clearCorrection: 0.45,
+            clearImpulse: 0.42,
+            stuckSpeed: 0.55,
+            phaseAfter: 0.22,
+            phaseDuration: 0.62,
+            phaseFallSpeed: 310,
+            dropSpeed: 7.0,
+            wiggleForce: 0.00045,
+            scurryRate: 10
+        },
+        {
+            id: "plow",
+            label: "F",
+            name: "Plow",
+            bodyColor: "#ff8c42",
+            headColor: "#ffa864",
+            earColor: "#ffd7ba",
+            strokeColor: "#8a3c08",
+            tailColor: "#de6f27",
+            noseColor: "#fff176",
+            density: 0.065,
+            friction: 0.02,
+            restitution: 0.14,
+            frictionAir: 0.0032,
+            radiusScale: 1.02,
+            colliderScale: 0.58,
+            impactKick: 1.85,
+            clearRadiusScale: 1.22,
+            clearCorrection: 1.25,
+            clearImpulse: 1.25,
+            stuckSpeed: 0.44,
+            phaseAfter: 0.4,
+            phaseDuration: 0.4,
+            phaseFallSpeed: 265,
+            dropSpeed: 6.7,
+            wiggleForce: 0.001,
+            scurryRate: 12
+        },
+        {
+            id: "snake",
+            label: "G",
+            name: "Snake",
+            bodyColor: "#2dd4bf",
+            headColor: "#5eead4",
+            earColor: "#ccfbf1",
+            strokeColor: "#0f766e",
+            tailColor: "#14b8a6",
+            noseColor: "#f472b6",
+            density: 0.044,
+            friction: 0.014,
+            restitution: 0.22,
+            frictionAir: 0.002,
+            radiusScale: 0.97,
+            colliderScale: 0.57,
+            impactKick: 1.05,
+            clearRadiusScale: 1,
+            clearCorrection: 0.7,
+            clearImpulse: 0.72,
+            stuckSpeed: 0.5,
+            phaseAfter: 0.36,
+            phaseDuration: 0.45,
+            phaseFallSpeed: 255,
+            dropSpeed: 7.1,
+            wiggleForce: 0.0018,
+            scurryRate: 20,
+            driftAmplitude: 0.9
+        },
+        {
+            id: "drop",
+            label: "H",
+            name: "Drop",
+            bodyColor: "#4f8cff",
+            headColor: "#78a6ff",
+            earColor: "#d6e4ff",
+            strokeColor: "#1d4ed8",
+            tailColor: "#3b73d9",
+            noseColor: "#fca5a5",
+            density: 0.05,
+            friction: 0.016,
+            restitution: 0.1,
+            frictionAir: 0.0024,
+            radiusScale: 0.98,
+            colliderScale: 0.55,
+            impactKick: 0.8,
+            clearRadiusScale: 0.92,
+            clearCorrection: 0.5,
+            clearImpulse: 0.45,
+            stuckSpeed: 0.58,
+            phaseAfter: 0.24,
+            phaseDuration: 0.55,
+            phaseFallSpeed: 360,
+            dropSpeed: 8.2,
+            wiggleForce: 0.00025,
+            scurryRate: 8
+        }
+    ];
     let debugEggSpawned = false;
+    let mouseLabSpawnIndex = 0;
+    let mouseLabCupSeeded = false;
     let totalDropsThisSession = 0;
     let cupLeftWall = null;
     let cupRightWall = null;
@@ -385,9 +616,32 @@
         return GameModes.isMouseSpawn(normalizeSpawn(spec));
     }
 
+    function getMouseLabVariant(id) {
+        if (!DEBUG_MOUSE_LAB) return null;
+        return MOUSE_LAB_VARIANTS.find(v => v.id === id) || MOUSE_LAB_VARIANTS[0];
+    }
+
+    function getMouseLabSpawnSpec() {
+        const variant = MOUSE_LAB_VARIANTS[mouseLabSpawnIndex % MOUSE_LAB_VARIANTS.length];
+        mouseLabSpawnIndex++;
+        return {
+            level: GameModes.MOUSE_LEVEL,
+            special: null,
+            mouseLabVariantId: variant.id
+        };
+    }
+
+    function mouseParam(mouse, key, fallback) {
+        const variant = mouse && mouse.mouseLabVariant;
+        return variant && variant[key] !== undefined ? variant[key] : fallback;
+    }
+
     function getSpawnRadius(spec) {
         const s = normalizeSpawn(spec);
-        if (isMouseSpawn(s)) return MOUSE_RADIUS;
+        if (isMouseSpawn(s)) {
+            const variant = getMouseLabVariant(s.mouseLabVariantId);
+            return MOUSE_RADIUS * (variant ? variant.radiusScale : 1);
+        }
         if (isGoldenSpawn(s)) return GameState.get_radius(2);
         return GameState.get_radius(s.level);
     }
@@ -442,14 +696,16 @@
         return cat;
     }
 
-    function createMouse(x, y, isDropped = false) {
-        const radius = MOUSE_RADIUS;
-        const colliderR = radius * 0.64;
+    function createMouse(x, y, isDropped = false, spawnSpec = null) {
+        const spec = normalizeSpawn(spawnSpec);
+        const variant = getMouseLabVariant(spec.mouseLabVariantId);
+        const radius = MOUSE_RADIUS * (variant ? variant.radiusScale : 1);
+        const colliderR = radius * (variant ? variant.colliderScale : 0.64);
         const body = Bodies.circle(x, y, colliderR, {
-            friction: 0.018,
-            restitution: 0.22,
-            frictionAir: 0.0025,
-            density: 0.05,
+            friction: variant ? variant.friction : 0.018,
+            restitution: variant ? variant.restitution : 0.22,
+            frictionAir: variant ? variant.frictionAir : 0.0025,
+            density: variant ? variant.density : 0.05,
             isSensor: false,
             isStatic: !isDropped,
             label: "mouse",
@@ -467,6 +723,7 @@
             isDropped,
             isMerged: false,
             isEscaping: isDropped,
+            mouseLabVariant: variant,
             scurryPhase: Math.random() * Math.PI * 2,
             stuckTime: 0,
             phaseTimer: 0,
@@ -485,7 +742,7 @@
     }
 
     function getMouseColliderRadius(mouse) {
-        return mouse.radius * 0.64;
+        return mouse.radius * mouseParam(mouse, "colliderScale", 0.64);
     }
 
     function resetMouseEscapeState(mouse, escaping) {
@@ -522,7 +779,7 @@
         const nx = dx / dist;
         const ny = dy / dist;
 
-        const kick = 1.6;
+        const kick = mouseParam(mouse, "impactKick", 1.6);
         Body.setVelocity(cat.body, {
             x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + nx * kick)),
             y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, ny) * kick * 0.6))
@@ -531,14 +788,14 @@
         if (!mouse.squeaked) {
             mouse.squeaked = true;
             playMergeSound(1.45);
-            spawnFloatingText(mx, my - 20, "Squeak!", "#f48fb1");
+            spawnFloatingText(mx, my - 20, mouse.mouseLabVariant ? mouse.mouseLabVariant.label : "Squeak!", mouse.mouseLabVariant ? mouse.mouseLabVariant.bodyColor : "#f48fb1");
         }
     }
 
     function applyMousePhaseClearance(mouse) {
         const mx = mouse.body.position.x;
         const my = mouse.body.position.y;
-        const phaseR = MOUSE_PHASE_CLEAR_RADIUS;
+        const phaseR = MOUSE_PHASE_CLEAR_RADIUS * mouseParam(mouse, "clearRadiusScale", 1);
 
         activeCats.forEach(cat => {
             if (cat.isMouse || !cat.isDropped || cat.isMerged) return;
@@ -561,13 +818,13 @@
                 : cat.body.position.x - (LEFT_LIMIT + cat.radius);
             if (sideRoom < 8) side *= -1;
 
-            const correction = Math.min(2.4, (0.45 + overlap * 0.045) * Math.min(heavy, 1.25));
+            const correction = Math.min(2.4, (0.45 + overlap * 0.045) * Math.min(heavy, 1.25) * mouseParam(mouse, "clearCorrection", 1));
             const yNudge = dy < -catR * 0.25 ? -correction * 0.08 : Math.min(0.7, correction * 0.08);
             const targetX = getClampedX(cat.body.position.x + side * correction, cat.radius);
             const targetY = Math.min(FLOOR_TOP_Y - catR, cat.body.position.y + yNudge);
             Body.setPosition(cat.body, { x: targetX, y: targetY });
 
-            const impulse = (0.45 + strength * 1.15) * Math.min(heavy, 1.25);
+            const impulse = (0.45 + strength * 1.15) * Math.min(heavy, 1.25) * mouseParam(mouse, "clearImpulse", 1);
             Body.setVelocity(cat.body, {
                 x: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.x + side * impulse)),
                 y: Math.max(-CatPhysics.MAX_CAT_SPEED, Math.min(CatPhysics.MAX_CAT_SPEED, cat.body.velocity.y + Math.max(0, dy / dist) * impulse * 0.04))
@@ -588,18 +845,20 @@
     function updateMice(delta) {
         activeCats.filter(c => c.isMouse && c.isDropped && c.isEscaping).forEach(mouse => {
             const dt = Math.min(delta, 0.05);
-            mouse.scurryPhase += dt * 14;
+            mouse.scurryPhase += dt * mouseParam(mouse, "scurryRate", 14);
 
             const r = getMouseColliderRadius(mouse);
             const floorY = FLOOR_TOP_Y - r;
+            const phaseFallSpeed = mouseParam(mouse, "phaseFallSpeed", MOUSE_PHASE_FALL_SPEED);
 
             if (mouse.isPhasing) {
                 mouse.phaseTimer -= dt;
 
                 const prevX = mouse.body.position.x;
                 const prevY = mouse.body.position.y;
-                const x = getClampedX(prevX + Math.sin(mouse.scurryPhase * 0.6) * 0.55, mouse.radius);
-                const y = Math.min(floorY, prevY + MOUSE_PHASE_FALL_SPEED * dt);
+                const drift = mouseParam(mouse, "driftAmplitude", 0.55);
+                const x = getClampedX(prevX + Math.sin(mouse.scurryPhase * 0.6) * drift, mouse.radius);
+                const y = Math.min(floorY, prevY + phaseFallSpeed * dt);
 
                 Body.setPosition(mouse.body, { x, y });
                 Body.setVelocity(mouse.body, { x: x - prevX, y: Math.max(1.8, y - prevY) });
@@ -613,19 +872,19 @@
                     mouse.body.isSensor = false;
                 }
             } else {
-                const wiggle = Math.sin(mouse.scurryPhase) * 0.0012 * mouse.body.mass;
+                const wiggle = Math.sin(mouse.scurryPhase) * mouseParam(mouse, "wiggleForce", 0.0012) * mouse.body.mass;
                 Body.applyForce(mouse.body, mouse.body.position, { x: wiggle, y: 0 });
 
                 const speed = Math.hypot(mouse.body.velocity.x, mouse.body.velocity.y);
-                if (speed < MOUSE_STUCK_SPEED && mouse.body.position.y < floorY - 4) {
+                if (speed < mouseParam(mouse, "stuckSpeed", MOUSE_STUCK_SPEED) && mouse.body.position.y < floorY - 4) {
                     mouse.stuckTime += dt;
                 } else {
                     mouse.stuckTime = Math.max(0, mouse.stuckTime - dt * 1.8);
                 }
 
-                if (mouse.stuckTime >= MOUSE_PHASE_AFTER) {
+                if (mouse.stuckTime >= mouseParam(mouse, "phaseAfter", MOUSE_PHASE_AFTER)) {
                     mouse.isPhasing = true;
-                    mouse.phaseTimer = MOUSE_PHASE_DURATION;
+                    mouse.phaseTimer = mouseParam(mouse, "phaseDuration", MOUSE_PHASE_DURATION);
                     mouse.body.isSensor = true;
                     Body.setVelocity(mouse.body, {
                         x: mouse.body.velocity.x * 0.25,
@@ -668,7 +927,7 @@
     }
 
     function spawnEntity(spawnSpec, x, y, isDropped) {
-        if (isMouseSpawn(spawnSpec)) return createMouse(x, y, isDropped);
+        if (isMouseSpawn(spawnSpec)) return createMouse(x, y, isDropped, spawnSpec);
         return createCat(spawnSpec, x, y, isDropped);
     }
 
@@ -857,7 +1116,7 @@
         currentCat.spawnScale = currentCat.isMouse ? 1.0 : 0.0;
         currentCat.scaleVelocity = 0.0;
 
-        nextSpawn = rollNextSpawn(handedSpawn);
+        nextSpawn = DEBUG_MOUSE_LAB ? getMouseLabSpawnSpec() : rollNextSpawn(handedSpawn);
         updateNextPreview();
         updateModeBadge();
 
@@ -906,10 +1165,52 @@
         });
     }
 
+    function seedMouseLabCup() {
+        if (!DEBUG_MOUSE_LAB || mouseLabCupSeeded || activeCats.length > 0) return;
+        mouseLabCupSeeded = true;
+
+        const labCats = [
+            { x: 160, y: 1048, level: 7, angle: -0.18 },
+            { x: 290, y: 1044, level: 5, angle: 0.12 },
+            { x: 420, y: 1042, level: 8, angle: -0.08 },
+            { x: 552, y: 1046, level: 4, angle: 0.2 },
+            { x: 220, y: 962, level: 3, angle: 0.16 },
+            { x: 350, y: 944, level: 6, angle: -0.22 },
+            { x: 482, y: 958, level: 2, angle: 0.1 },
+            { x: 164, y: 878, level: 4, angle: -0.1 },
+            { x: 292, y: 850, level: 1, angle: 0.2 },
+            { x: 424, y: 860, level: 7, angle: -0.14 },
+            { x: 548, y: 884, level: 3, angle: 0.08 },
+            { x: 246, y: 780, level: 5, angle: -0.18 },
+            { x: 382, y: 760, level: 2, angle: 0.12 },
+            { x: 514, y: 792, level: 6, angle: -0.08 }
+        ];
+
+        labCats.forEach(spec => {
+            const cat = createCat({ level: spec.level, special: null }, spec.x, spec.y, true);
+            cat.spawnScale = 1.0;
+            Body.setStatic(cat.body, false);
+            Body.setAngle(cat.body, spec.angle);
+            Body.setVelocity(cat.body, { x: 0, y: 0 });
+            Body.setAngularVelocity(cat.body, 0);
+            World.add(engine.world, cat.body);
+            activeCats.push(cat);
+        });
+
+        totalDropsThisSession = Math.max(totalDropsThisSession, 80);
+        spawnFloatingText(360, 330, "MOUSE LAB A-H", "#ffffff");
+    }
+
     function getSpawnSpecFromCat(cat) {
         if (!cat) return { level: 1, special: null };
         if (cat.isGoldenBall) return { level: GameModes.GOLDEN_LEVEL, special: null };
-        if (cat.isMouse) return { level: GameModes.MOUSE_LEVEL, special: null };
+        if (cat.isMouse) {
+            return {
+                level: GameModes.MOUSE_LEVEL,
+                special: null,
+                mouseLabVariantId: cat.mouseLabVariant ? cat.mouseLabVariant.id : undefined
+            };
+        }
         return { level: cat.level, special: cat.specialType || null };
     }
 
@@ -1057,7 +1358,7 @@
         if (cat.isMouse) {
             resetMouseEscapeState(cat, true);
             cat.squeaked = false;
-            Body.setVelocity(cat.body, { x: 0, y: 7.0 });
+            Body.setVelocity(cat.body, { x: 0, y: mouseParam(cat, "dropSpeed", 7.0) });
         }
 
         World.add(engine.world, cat.body);
@@ -1849,7 +2150,7 @@
         if (cat.isGoldenBall) {
             CatSprite.drawGolden(ctx, radius, Date.now());
         } else if (cat.isMouse) {
-            CatSprite.drawMouse(ctx, radius, Date.now(), getMouseFaceAngle(cat));
+            CatSprite.drawMouse(ctx, radius, Date.now(), getMouseFaceAngle(cat), cat.mouseLabVariant);
         } else {
             const img = getCatImage(level);
 
@@ -1965,7 +2266,7 @@
         const preview = document.getElementById("next-preview-image");
         const previewD = 62;
         if (isMouseSpawn(nextSpawn)) {
-            CatSprite.renderMousePreview(preview, previewD, 0.9);
+            CatSprite.renderMousePreview(preview, previewD, 0.9, getMouseLabVariant(nextSpawn.mouseLabVariantId));
         } else if (isGoldenSpawn(nextSpawn)) {
             CatSprite.renderGoldenPreview(preview, previewD, 0.9);
         } else {
@@ -1975,11 +2276,11 @@
 
     function updateModeBadge() {
         const badge = document.getElementById("mode-badge");
-        if (badge) badge.textContent = GameModes.modeLabel(currentGameMode);
+        if (badge) badge.textContent = DEBUG_MOUSE_LAB ? "Mouse Lab" : GameModes.modeLabel(currentGameMode);
     }
 
     function startGameMode(mode) {
-        currentGameMode = mode;
+        currentGameMode = DEBUG_MOUSE_LAB ? GameModes.MODES.CLASSIC : mode;
         dailySpawnIndex = 0;
         totalDropsThisSession = 0;
         cupTiltAngle = 0;
@@ -1988,7 +2289,12 @@
         chaosTiltPhase = "idle";
         mergeCountSinceTilt = 0;
         applyCupGravity();
-        if (mode === GameModes.MODES.DAILY) {
+        if (DEBUG_MOUSE_LAB) {
+            mouseLabSpawnIndex = 0;
+            mouseLabCupSeeded = false;
+            nextSpawn = getMouseLabSpawnSpec();
+            seedMouseLabCup();
+        } else if (mode === GameModes.MODES.DAILY) {
             nextSpawn = ensureSpawnAllowed(GameModes.getNextSpawn(mode, 0));
             dailySpawnIndex = 1;
         } else {
@@ -2061,6 +2367,8 @@
         floatingTexts = [];
         devPeekEffect = null;
         debugEggSpawned = false;
+        mouseLabSpawnIndex = 0;
+        mouseLabCupSeeded = false;
 
         GameState.resetScore();
         startGameMode(currentGameMode);
@@ -2418,6 +2726,7 @@
     }
 
     function saveGameSession() {
+        if (DEBUG_MOUSE_LAB) return;
         if (isGameOver) return;
         GameState.saveActiveSession(GameState.score, GameState.fish_coins, nextSpawn, getSerializableCats(), {
             game_mode: currentGameMode,
@@ -3356,9 +3665,11 @@
     window.addEventListener("load", () => {
         let imagesReady = false;
         let audioReady = false;
+        let gameBooted = false;
 
-        function tryStart() {
-            if (!imagesReady || !audioReady) return;
+        function bootGame() {
+            if (gameBooted) return;
+            gameBooted = true;
 
             loadSoundSet(GameState.active_sound_set);
             updateAudioButtons();
@@ -3378,11 +3689,32 @@
                 window.visualViewport.addEventListener("resize", updateNextPreview);
             }
 
-            if (GameState.hasSavedSession()) {
+            if (DEBUG_MOUSE_LAB) {
+                startGameMode(GameModes.MODES.CLASSIC);
+                updateHUD();
+                spawnNewCat();
+                closeAllModals();
+                canDrop = true;
+            } else if (GameState.hasSavedSession()) {
                 openModal(document.getElementById("resume-overlay"));
             } else {
                 openModeSelectModal();
             }
+        }
+
+        function tryStart() {
+            if (!imagesReady || !audioReady) return;
+            bootGame();
+        }
+
+        function tryMouseLabFallbackStart() {
+            if (!DEBUG_MOUSE_LAB || gameBooted) return;
+            if (!imagesReady) {
+                setTimeout(tryMouseLabFallbackStart, 250);
+                return;
+            }
+            audioReady = true;
+            bootGame();
         }
 
         preloadAssets(() => {
@@ -3396,6 +3728,10 @@
             audioReady = true;
             tryStart();
         });
+
+        if (DEBUG_MOUSE_LAB) {
+            setTimeout(tryMouseLabFallbackStart, 1500);
+        }
     });
 
 })();
