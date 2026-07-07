@@ -1165,6 +1165,44 @@
         return cat.radius * CatPhysics.COLLIDER_RADIUS_SCALE;
     }
 
+    function isCatSupportedInStack(cat, radius, floorY) {
+        const pos = cat.body.position;
+        if (pos.y >= floorY - CatPhysics.STACK_SUPPORT_MARGIN) return true;
+
+        for (const other of activeCats) {
+            if (other === cat || !other.isDropped || other.body.isStatic || other.isMouse) continue;
+            const otherRadius = getCatColliderRadius(other);
+            const dx = other.body.position.x - pos.x;
+            const dy = other.body.position.y - pos.y;
+            if (dy <= 2) continue;
+
+            const contactReach = radius + otherRadius + CatPhysics.STACK_SUPPORT_MARGIN;
+            if (dx * dx + dy * dy <= contactReach * contactReach) return true;
+        }
+
+        return false;
+    }
+
+    function settleSupportedCat(cat, radius, floorY) {
+        if (cat.isMouse || cat.isGoldenBall || Math.abs(cupTiltAngle) > 0.02) return;
+        if (shakeDuration > 0) return;
+
+        const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
+        const angSpeed = Math.abs(cat.body.angularVelocity);
+        const supported = isCatSupportedInStack(cat, radius, floorY);
+        if (!supported || speed > CatPhysics.STACK_SETTLE_LINEAR_SPEED || angSpeed > CatPhysics.STACK_SETTLE_ANGULAR_SPEED) return;
+
+        const vx = cat.body.velocity.x * CatPhysics.STACK_SETTLE_LINEAR_DAMPING;
+        const vy = cat.body.velocity.y * CatPhysics.STACK_SETTLE_LINEAR_DAMPING;
+        Body.setVelocity(cat.body, {
+            x: Math.abs(vx) < CatPhysics.STACK_SETTLE_STOP_LINEAR_SPEED ? 0 : vx,
+            y: Math.abs(vy) < CatPhysics.STACK_SETTLE_STOP_LINEAR_SPEED ? 0 : vy
+        });
+
+        const av = cat.body.angularVelocity * CatPhysics.STACK_SETTLE_ANGULAR_DAMPING;
+        Body.setAngularVelocity(cat.body, Math.abs(av) < CatPhysics.STACK_SETTLE_STOP_ANGULAR_SPEED ? 0 : av);
+    }
+
     function clampCatInCup(cat) {
         if (!cat.isDropped || cat.body.isStatic) return;
 
@@ -1218,6 +1256,8 @@
             const damping = restingOnFloor ? CatPhysics.RESTING_ANGULAR_DAMPING : 0.94;
             Body.setAngularVelocity(cat.body, cat.body.angularVelocity * damping);
         }
+
+        settleSupportedCat(cat, r, maxY);
     }
 
     function clampAllCatsInCup() {
