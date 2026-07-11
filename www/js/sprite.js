@@ -100,14 +100,19 @@ const CatSprite = (function() {
             ctx.save();
             if (angle) ctx.rotate(angle);
             
-            // Draw the mouse image centered
-            ctx.beginPath();
-            ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.clip();
+            // Draw the mouse image in full, without clipping it to a circle
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
-            const r = radius * EDGE_OVERSCALE;
-            ctx.drawImage(mouseImg, -r, -r, r * 2, r * 2);
+            
+            // Adjust visual size to fit nicely in the game without cropping
+            // Mouse should look slightly bigger visually but still keep its correct physics body
+            const scale = 1.35;
+            const drawW = radius * 2 * scale;
+            const drawH = (mouseImg.naturalHeight / mouseImg.naturalWidth) * drawW;
+            
+            // Draw centered, adjusting offset slightly upwards to align physics center with the mouse body center
+            // (the feather/hat makes the image taller at the top)
+            ctx.drawImage(mouseImg, -drawW / 2, -drawH / 2 + (drawH * 0.08), drawW, drawH);
             ctx.restore();
 
             if (style && style.label) {

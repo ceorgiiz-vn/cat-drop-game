@@ -157,10 +157,10 @@
         friction: 0.02,
         restitution: 0.02,
         frictionAir: 0.001,
-        radiusScale: 1.0,
+        radiusScale: 1.15, // Made larger, between cat level 3 (~42px) and 4 (~50px)
         colliderScale: 0.46,
         dropSpeed: 9.2,
-        swordReach: 1.82
+        swordReach: 1.62 // Adjusted sword reach for larger visual body
     };
     let totalDropsThisSession = 0;
     let cupLeftWall = null;
@@ -3340,6 +3340,15 @@
             audioReady = true;
             tryStart();
         });
+        // Expose debug API for screen capture and testing
+        window.__DEBUG_GAME__ = {
+            activeCats: () => activeCats,
+            engine: () => engine,
+            createCat: (spec, x, y, isDropped) => createCat(spec, x, y, isDropped),
+            createMouse: (x, y, isDropped) => createMouse(x, y, isDropped),
+            Composite: Composite,
+            World: World
+        };
     });
 
 })();
