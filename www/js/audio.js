@@ -46,7 +46,8 @@ const GameAudio = (function() {
             sfxBus.connect(compressor);
         }
         if (ctx.state === "suspended") {
-            return ctx.resume();
+            // Do NOT return ctx.resume() here. It will hang the promise forever
+            // if the browser blocks autoplay. Let unlockAudio() handle resuming later.
         }
         return Promise.resolve();
     }

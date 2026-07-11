@@ -50,7 +50,7 @@ const GameModes = (function() {
     function rollSpawn(rng, exclude) {
         const ctx = exclude && exclude.spawnContext;
         const blockMouse = !!(exclude && exclude.noMouse) || (ctx ? !canSpawnMouse(ctx) : true);
-        const blockGolden = !!(exclude && exclude.noGolden);
+        const blockGolden = !!(exclude && exclude.noGolden) || (ctx ? ctx.totalDrops < 20 : false);
         if (!blockMouse && !blockGolden) {
             return rollSpawnRaw(rng);
         }

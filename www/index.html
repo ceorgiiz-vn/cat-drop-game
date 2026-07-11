@@ -13,14 +13,14 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png">
 
     <title>Cat Drop 2</title>
-    <link rel="stylesheet" href="style.css?v=42">
+    <link rel="stylesheet" href="style.css?v=44">
     <script src="js/telegram.js?v=1"></script>
-    
+
     <!-- Matter.js Physics Engine -->
     <script src="js/matter.min.js"></script>
-    
+
     <!-- State and Session Manager -->
-    <script src="js/state.js?v=4"></script>
+    <script src="js/state.js?v=5"></script>
     <script src="js/game_modes.js?v=7"></script>
     <script src="js/sprite.js?v=17"></script>
     <script src="js/responsive.js?v=2"></script>
@@ -32,69 +32,78 @@
         <!-- HUD sits on top of the game viewport -->
         <div class="hud-container">
         
-        <!-- Unified top HUD bar -->
-        <div class="hud-element hud-top-bar">
-            <div class="hud-cell hud-left-top">
-                <span class="mode-badge" id="mode-badge" title="Classic mode">Classic</span>
-                <div class="hud-fish-wallet" title="Fish Coins">
-                    <span class="hud-fish-icon" aria-hidden="true">🐟</span>
-                    <span class="hud-fish-amount hud-num" id="coin-val" data-digits="1">0</span>
-                </div>
-            </div>
-
-            <div class="hud-cell hud-center">
-                <span class="next-title" id="next-title-text">NEXT</span>
-                <div class="next-preview-container">
-                    <canvas class="next-preview-img" id="next-preview-image"></canvas>
-                </div>
-            </div>
-
-            <div class="hud-cell hud-right-top">
-                <button class="hud-player-chip" id="name-display-btn" title="Player profile">
-                    <span class="hud-player-avatar" id="player-avatar">G</span>
-                    <span class="hud-player-name" id="player-name-text">Guest</span>
-                </button>
-            </div>
-
-            <div class="hud-cell hud-left-bottom">
-                <div class="hud-score-panel">
-                    <span class="score-title" id="score-title-text">SCORE</span>
-                    <span class="score-value hud-num" id="score-val" data-digits="1">0</span>
-                </div>
-            </div>
-
-            <div class="hud-cell hud-right-bottom">
-                <div class="hud-records-grid">
-                    <div class="hud-record hud-record-best-cell">
-                        <span class="hud-record-label" id="highscore-title-text">ALL</span>
-                        <span class="hud-record-value hud-num" id="highscore-val" data-digits="1">0</span>
+        <!-- Top HUD: Next+Score left, Notch center, Menu+Records right -->
+        <div class="hud-top-split">
+            <!-- Left Column: Score & Next Cat -->
+            <div class="hud-left-col">
+                <!-- Score & Coins Plate -->
+                <div class="hud-score-plate">
+                    <div class="stat-cell stat-highlight">
+                        <div class="stat-label" id="score-title-text">SCORE</div>
+                        <div class="stat-value" id="score-val">0</div>
                     </div>
-                    <div class="hud-record">
-                        <span class="hud-record-label" id="today-title-text">DAY</span>
-                        <span class="hud-record-value hud-num" id="today-val" data-digits="1">0</span>
+                    <div class="stat-cell">
+                        <div class="stat-value">
+                            <span class="hud-fish-icon">🐟</span> <span id="coin-val">0</span>
+                        </div>
                     </div>
-                    <div class="hud-record">
-                        <span class="hud-record-label" id="year-title-text">YEAR</span>
-                        <span class="hud-record-value hud-num" id="year-val" data-digits="1">0</span>
+                </div>
+                
+                <!-- NEXT Preview -->
+                <div class="hud-next-wrap">
+                    <div class="next-label">NEXT</div>
+                    <div class="next-preview-ring">
+                        <canvas class="next-preview-canvas" id="next-preview-image"></canvas>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Audio and Help toggles at left -->
-        <div class="hud-element left-controls-container">
-            <button class="paper-button control-small-btn" id="sfx-btn" title="Toggle Sound Effects">🔊</button>
-            <button class="paper-button control-small-btn" id="music-btn" title="Toggle Music">🎵</button>
-            <button class="paper-button control-small-btn" id="help-btn" title="How to Play">❔</button>
-        </div>
+            <!-- Center: Invisible Notch Spacer -->
+            <div class="notch-safe-zone"></div>
 
-        <!-- Control modals toggles at right -->
-        <div class="hud-element controls-container">
-            <button class="paper-button control-small-btn" id="shop-btn" title="Theme/Skin/Sound Shop">🛒</button>
-            <button class="paper-button control-small-btn" id="evolution-btn" title="Cat Evolution Chart">🧬</button>
-            <button class="paper-button control-small-btn" id="leaderboard-btn" title="Global Leaderboard">🏆</button>
-            <button class="paper-button control-small-btn quick-restart-btn" id="quick-restart-btn" title="Restart">🔄</button>
-        </div>
+            <!-- Right Column: Controls & Records Stack -->
+            <div class="hud-right-col">
+                <!-- Top controls row -->
+                <div class="hud-controls-row">
+                    <button class="hud-audio-btn" id="hud-sfx-btn" title="Toggle SFX">🔊</button>
+                    <button class="hud-audio-btn" id="hud-music-btn" title="Toggle Music">🎵</button>
+                    
+                    <div class="hud-menu-wrap">
+                        <button class="hamburger-btn" id="main-menu-btn" title="Menu">☰</button>
+                        <div class="expandable-menu" id="settings-menu">
+                            <button class="menu-item-btn" id="name-display-btn">
+                                <span class="hud-player-avatar" id="player-avatar">G</span> <span class="menu-item-text">Profile</span>
+                            </button>
+                            <button class="menu-item-btn" id="shop-btn">🛒 <span class="menu-item-text">Shop</span></button>
+                            <button class="menu-item-btn" id="leaderboard-btn">🏆 <span class="menu-item-text">Leaders</span></button>
+                            <button class="menu-item-btn" id="evolution-btn">🧬 <span class="menu-item-text">Evolution</span></button>
+                            <button class="menu-item-btn" id="sfx-btn">🔊 <span class="menu-item-text">SFX</span></button>
+                            <button class="menu-item-btn" id="music-btn">🎵 <span class="menu-item-text">Music</span></button>
+                            <button class="menu-item-btn" id="help-btn">❔ <span class="menu-item-text">Help</span></button>
+                            <button class="menu-item-btn quick-restart-btn" id="quick-restart-btn">🔄 <span class="menu-item-text">Restart</span></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Records Plate — реальные локальные рекорды (без пустых ---) -->
+                <div class="hud-records-plate">
+                    <div class="stat-cell">
+                        <div class="stat-label">BEST</div>
+                        <div class="stat-value" id="highscore-val">0</div>
+                    </div>
+                    <div class="stat-cell">
+                        <div class="stat-label">TODAY</div>
+                        <div class="stat-value" id="today-best-val">0</div>
+                    </div>
+                    <div class="stat-cell">
+                        <div class="stat-label">YEAR</div>
+                        <div class="stat-value" id="year-best-val">0</div>
+                    </div>
+                </div>
+                <!-- Hidden element for JS compatibility -->
+                <span id="next-title-text" style="display:none;"></span>
+            </div>
+        </div><!-- /.hud-top-split -->
 
         <!-- Boosters container at left -->
         <div class="hud-element boosters-container">
@@ -294,10 +303,10 @@
     <script src="js/physics.js?v=8"></script>
 
     <!-- GPGS & App Native Events -->
-    <script src="js/play_games.js?v=1"></script>
+    <script src="js/play_games.js?v=2"></script>
 
     <!-- Core Game Controller Logic -->
-    <script src="js/game.js?v=80"></script>
+    <script src="js/game.js?v=82"></script>
     
     <!-- Register Service Worker -->
     <script>
@@ -309,6 +318,6 @@
             });
         }
     </script>
-    <div id="rotate-hint" aria-hidden="true">📱 Лучше в портретной ориентации</div>
+    <div id="rotate-hint" aria-hidden="true">📱 Best played in portrait</div>
 </body>
 </html>

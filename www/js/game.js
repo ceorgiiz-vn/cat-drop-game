@@ -34,6 +34,8 @@
     let devCatPeekImage = null;
     let gameSessionId = 0;
     let lastTime = performance.now();
+    let physicsAccumulator = 0;
+    let currentMaxDeathTime = 0;
     let lastUndoSnapshot = null;
     let pendingGameOver = false;
     let pendingGameOverScore = 0;
@@ -124,18 +126,21 @@
         }
     }
     const THEMES = ["Indigo Night", "Violet Night", "Forest Night", "Rose Night", "Charcoal Night"];
-    const SPAWN_Y = 220;
+    const GAME_Y_OFFSET = 90;
+    const SPAWN_Y = 220 + GAME_Y_OFFSET;
     const LEFT_LIMIT = 80;
     const RIGHT_LIMIT = 640;
-    const CUP_RIM_Y = 250;
-    const CUP_PHYSICS_TOP_Y = 80; // invisible wall extension above visual rim (avoids top-corner bounce)
-    const FLOOR_TOP_Y = 1100;
+    const CUP_RIM_Y = 250 + GAME_Y_OFFSET;
+    const CUP_PHYSICS_TOP_Y = 80 + GAME_Y_OFFSET; // invisible wall extension above visual rim (avoids top-corner bounce)
+    const FLOOR_TOP_Y = 1100 + GAME_Y_OFFSET;
     const mergingBodyIds = new Set();
     const MOUSE_RADIUS = 22 * GameState.CAT_SIZE_SCALE;
-    const BOOSTER_SHAKE_COST = 5000;
-    const BOOSTER_POP_COST = 12000;
-    /** TEMP: spawn two lvl-11 cats for easter-egg testing — set false before release */
-    const DEBUG_ULTIMATE_EGG_TEST = false;
+    // BUG-B fix: цены совпадают с подписями на кнопках в index.html (1000 / 2500).
+    const BOOSTER_SHAKE_COST = 1000;
+    const BOOSTER_POP_COST = 2500;
+    // BUG-C fix: Google Play Games. Пусто = не настроено (нет google-services.json).
+    // Впишите сюда настоящий leaderboard ID из Play Console, чтобы включить GPGS.
+    const GPGS_LEADERBOARD_ID = "CgkIvqayqO0GEAIQAQ";
     const FINAL_MOUSE_TUNING = {
         bodyColor: "#8d6e63",
         headColor: "#a98272",
@@ -157,22 +162,37 @@
         dropSpeed: 9.2,
         swordReach: 1.82
     };
-    let debugEggSpawned = false;
     let totalDropsThisSession = 0;
     let cupLeftWall = null;
     let cupRightWall = null;
+    let cupLeftCorner = null;
+    let cupRightCorner = null;
     let cupFloor = null;
 
     const CUP_WALL_LEFT_X = 90;
     const CUP_WALL_RIGHT_X = 630;
-    const CUP_WALL_BOTTOM_Y = 1035;
+    const CUP_WALL_BOTTOM_Y = 1075 + GAME_Y_OFFSET;
+    const CUP_CORNER_LEFT_A = { x: 80, y: 1075 + GAME_Y_OFFSET };
+    const CUP_CORNER_LEFT_B = { x: 110, y: 1098 + GAME_Y_OFFSET };
+    const CUP_CORNER_RIGHT_A = { x: 610, y: 1098 + GAME_Y_OFFSET };
+    const CUP_CORNER_RIGHT_B = { x: 640, y: 1075 + GAME_Y_OFFSET };
     const CUP_FLOOR_X = 360;
-    const CUP_FLOOR_Y = 1110;
+    const CUP_FLOOR_Y = 1110 + GAME_Y_OFFSET;
     const CUP_PIVOT_X = 360;
-    const CUP_PIVOT_Y = 1060; // pivot near cup base — cats roll to lower corner, not the side wall
-    // The lower pocket is a calm settling zone: side walls stop above the floor so
-    // cats do not get trapped between two contact normals or launched by a ramp.
-    const WALL_BOTTOM_PADDING = 0;
+    const CUP_PIVOT_Y = 1060 + GAME_Y_OFFSET; // pivot near cup base
+    const WALL_CORNER_OVERLAP = 10;
+    const CORNER_THICKNESS = 22;
+    const LEFT_CORNER_ANGLE = Math.atan2(CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y, CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x);
+    const RIGHT_CORNER_ANGLE = Math.atan2(CUP_CORNER_RIGHT_B.y - CUP_CORNER_RIGHT_A.y, CUP_CORNER_RIGHT_B.x - CUP_CORNER_RIGHT_A.x);
+    const LEFT_CORNER_CENTER = {
+        x: (CUP_CORNER_LEFT_A.x + CUP_CORNER_LEFT_B.x) / 2,
+        y: (CUP_CORNER_LEFT_A.y + CUP_CORNER_LEFT_B.y) / 2
+    };
+    const RIGHT_CORNER_CENTER = {
+        x: (CUP_CORNER_RIGHT_A.x + CUP_CORNER_RIGHT_B.x) / 2,
+        y: (CUP_CORNER_RIGHT_A.y + CUP_CORNER_RIGHT_B.y) / 2
+    };
+    const CORNER_LENGTH = Math.hypot(CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x, CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y) + 18;
 
     function rotatePoint(px, py, angle) {
         const dx = px - CUP_PIVOT_X;
@@ -197,18 +217,24 @@
     }
 
     function updateCupBoundaries(angle) {
-        if (!cupLeftWall || !cupRightWall || !cupFloor) return;
-        const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_BOTTOM_PADDING;
+        if (!cupLeftWall || !cupRightWall || !cupLeftCorner || !cupRightCorner || !cupFloor) return;
+        const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_CORNER_OVERLAP;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
 
         const leftPos = rotatePoint(CUP_WALL_LEFT_X, wallCenterY, angle);
         const rightPos = rotatePoint(CUP_WALL_RIGHT_X, wallCenterY, angle);
+        const leftCornerPos = rotatePoint(LEFT_CORNER_CENTER.x, LEFT_CORNER_CENTER.y, angle);
+        const rightCornerPos = rotatePoint(RIGHT_CORNER_CENTER.x, RIGHT_CORNER_CENTER.y, angle);
         const floorPos = rotatePoint(CUP_FLOOR_X, CUP_FLOOR_Y, angle);
 
         Body.setPosition(cupLeftWall, leftPos);
         Body.setAngle(cupLeftWall, angle);
         Body.setPosition(cupRightWall, rightPos);
         Body.setAngle(cupRightWall, angle);
+        Body.setPosition(cupLeftCorner, leftCornerPos);
+        Body.setAngle(cupLeftCorner, LEFT_CORNER_ANGLE + angle);
+        Body.setPosition(cupRightCorner, rightCornerPos);
+        Body.setAngle(cupRightCorner, RIGHT_CORNER_ANGLE + angle);
         Body.setPosition(cupFloor, floorPos);
         Body.setAngle(cupFloor, angle);
     }
@@ -262,7 +288,7 @@
 
         // Rigid side walls stop above the floor. The bottom is flat, so a cat
         // dropped into the corner can settle instead of riding a diagonal ramp.
-        const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_BOTTOM_PADDING;
+        const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_CORNER_OVERLAP;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
         cupLeftWall = Bodies.rectangle(CUP_WALL_LEFT_X, wallCenterY, 20, wallHeight, { 
             isStatic: true, 
@@ -274,13 +300,25 @@
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
         });
+        cupLeftCorner = Bodies.rectangle(LEFT_CORNER_CENTER.x, LEFT_CORNER_CENTER.y, CORNER_LENGTH, CORNER_THICKNESS, {
+            isStatic: true,
+            angle: LEFT_CORNER_ANGLE,
+            friction: CatPhysics.WALL_FRICTION,
+            restitution: CatPhysics.WALL_RESTITUTION
+        });
+        cupRightCorner = Bodies.rectangle(RIGHT_CORNER_CENTER.x, RIGHT_CORNER_CENTER.y, CORNER_LENGTH, CORNER_THICKNESS, {
+            isStatic: true,
+            angle: RIGHT_CORNER_ANGLE,
+            friction: CatPhysics.WALL_FRICTION,
+            restitution: CatPhysics.WALL_RESTITUTION
+        });
         cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, 560, 20, { 
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
         });
 
-        World.add(engine.world, [cupLeftWall, cupRightWall, cupFloor]);
+        World.add(engine.world, [cupLeftWall, cupRightWall, cupLeftCorner, cupRightCorner, cupFloor]);
         updateCupBoundaries(cupTiltAngle);
         applyCupGravity();
 
@@ -668,6 +706,9 @@
         if (GameModes.isMouseSpawn(spec) && !GameModes.canSpawnMouse(getSpawnContext())) {
             return { level: Math.floor(Math.random() * 4) + 1, special: null };
         }
+        if (GameModes.isGoldenSpawn(spec) && totalDropsThisSession < 20) {
+            return { level: Math.floor(Math.random() * 4) + 1, special: null };
+        }
         return spec;
     }
 
@@ -792,8 +833,6 @@
         } else {
             canDrop = true;
         }
-
-        spawnDebugUltimatePair();
     }
 
     function spawnMergedCat(x, y, level, specialType) {
@@ -806,30 +845,6 @@
         cat.scaleVelocity = 0.0;
         World.add(engine.world, cat.body);
         activeCats.push(cat);
-    }
-
-    /** TEMP debug — two lvl-11 cats at the bottom, almost touching (knock together to pop) */
-    function spawnDebugUltimatePair() {
-        if (!DEBUG_ULTIMATE_EGG_TEST || debugEggSpawned) return;
-        debugEggSpawned = true;
-
-        const level = 11;
-        const r = GameState.get_radius(level);
-        const colliderR = r * CatPhysics.COLLIDER_RADIUS_SCALE;
-        const y = FLOOR_TOP_Y - colliderR - 4;
-        const touchGap = colliderR * 2 + 6;
-        const leftX = 360 - touchGap / 2;
-        const rightX = 360 + touchGap / 2;
-
-        [leftX, rightX].forEach(x => {
-            const cat = createCat({ level, special: null }, x, y, true);
-            cat.spawnScale = 1.0;
-            Body.setStatic(cat.body, false);
-            Body.setVelocity(cat.body, { x: 0, y: 0 });
-            Body.setAngularVelocity(cat.body, 0);
-            World.add(engine.world, cat.body);
-            activeCats.push(cat);
-        });
     }
 
     function getSpawnSpecFromCat(cat) {
@@ -899,6 +914,7 @@
 
         closeModal(document.getElementById("gameover-overlay"));
         isGameOver = false;
+        currentMaxDeathTime = 0;
         isTargetingEraser = false;
         mergingBodyIds.clear();
         particles = [];
@@ -919,7 +935,7 @@
         nextSpawn = { ...snap.next_spawn };
         const spawnRadius = getSpawnRadius(snap.current_spawn);
         currentCat = spawnEntity(snap.current_spawn, getClampedX(mouseX, spawnRadius), SPAWN_Y, false);
-        currentCat.spawnScale = currentCat.isMouse ? 1.0 : 1.0;
+        currentCat.spawnScale = 1.0;
         currentCat.scaleVelocity = 0;
 
         updateNextPreview();
@@ -1672,22 +1688,22 @@
         ctx.rotate(cupTiltAngle);
         ctx.translate(-CUP_PIVOT_X, -CUP_PIVOT_Y);
 
-        drawWobblyLine(80, 250, 80, 1075, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
-        drawWobblyLine(80, 1075, 110, 1098, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
-        drawWobblyLine(110, 1098, 610, 1098, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
-        drawWobblyLine(610, 1098, 640, 1075, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
-        drawWobblyLine(640, 1075, 640, 250, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
+        drawWobblyLine(LEFT_LIMIT, CUP_RIM_Y, LEFT_LIMIT, CUP_WALL_BOTTOM_Y, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
+        drawWobblyLine(LEFT_LIMIT, CUP_WALL_BOTTOM_Y, 110, CUP_WALL_BOTTOM_Y + 23, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
+        drawWobblyLine(110, CUP_WALL_BOTTOM_Y + 23, 610, CUP_WALL_BOTTOM_Y + 23, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
+        drawWobblyLine(610, CUP_WALL_BOTTOM_Y + 23, RIGHT_LIMIT, CUP_WALL_BOTTOM_Y, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
+        drawWobblyLine(RIGHT_LIMIT, CUP_WALL_BOTTOM_Y, RIGHT_LIMIT, CUP_RIM_Y, colors.pencilColor.replace("0.35", "0.75"), 2.0, 1.0);
 
         // Double wobbles and diagonal hatchings
-        drawWobblyLine(84, 250, 84, 1070, colors.pencilColor.replace("0.35", "0.4"), 1.0, 0.8);
-        drawWobblyLine(636, 1070, 636, 250, colors.pencilColor.replace("0.35", "0.4"), 1.0, 0.8);
+        drawWobblyLine(LEFT_LIMIT + 4, CUP_RIM_Y, LEFT_LIMIT + 4, CUP_WALL_BOTTOM_Y - 5, colors.pencilColor.replace("0.35", "0.4"), 1.0, 0.8);
+        drawWobblyLine(RIGHT_LIMIT - 4, CUP_WALL_BOTTOM_Y - 5, RIGHT_LIMIT - 4, CUP_RIM_Y, colors.pencilColor.replace("0.35", "0.4"), 1.0, 0.8);
         
         // Hatch lines down left wall
-        let segY = 270;
-        while (segY < 1050) {
+        let segY = CUP_RIM_Y + 20;
+        while (segY < CUP_WALL_BOTTOM_Y - 25) {
             ctx.beginPath();
-            ctx.moveTo(80, segY);
-            ctx.lineTo(95, segY + 8);
+            ctx.moveTo(LEFT_LIMIT, segY);
+            ctx.lineTo(LEFT_LIMIT + 15, segY + 8);
             ctx.strokeStyle = colors.pencilColor;
             ctx.lineWidth = 1.0;
             ctx.stroke();
@@ -1695,11 +1711,11 @@
         }
 
         // Hatch lines down right wall
-        segY = 270;
-        while (segY < 1050) {
+        segY = CUP_RIM_Y + 20;
+        while (segY < CUP_WALL_BOTTOM_Y - 25) {
             ctx.beginPath();
-            ctx.moveTo(640, segY);
-            ctx.lineTo(625, segY + 8);
+            ctx.moveTo(RIGHT_LIMIT, segY);
+            ctx.lineTo(RIGHT_LIMIT - 15, segY + 8);
             ctx.strokeStyle = colors.pencilColor;
             ctx.lineWidth = 1.0;
             ctx.stroke();
@@ -1707,30 +1723,30 @@
         }
 
         // Vertical reflections
-        drawWobblyLine(95, 270, 95, 1050, colors.penColor.replace("0.45", "0.2"), 1.0, 0.8);
-        drawWobblyLine(105, 280, 105, 1030, colors.penColor.replace("0.45", "0.1"), 0.8, 0.6);
-        drawWobblyLine(625, 270, 625, 1050, colors.penColor.replace("0.45", "0.2"), 1.0, 0.8);
-        drawWobblyLine(615, 280, 615, 1030, colors.penColor.replace("0.45", "0.1"), 0.8, 0.6);
+        drawWobblyLine(LEFT_LIMIT + 15, CUP_RIM_Y + 20, LEFT_LIMIT + 15, CUP_WALL_BOTTOM_Y - 25, colors.penColor.replace("0.45", "0.2"), 1.0, 0.8);
+        drawWobblyLine(LEFT_LIMIT + 25, CUP_RIM_Y + 30, LEFT_LIMIT + 25, CUP_WALL_BOTTOM_Y - 45, colors.penColor.replace("0.45", "0.1"), 0.8, 0.6);
+        drawWobblyLine(RIGHT_LIMIT - 15, CUP_RIM_Y + 20, RIGHT_LIMIT - 15, CUP_WALL_BOTTOM_Y - 25, colors.penColor.replace("0.45", "0.2"), 1.0, 0.8);
+        drawWobblyLine(RIGHT_LIMIT - 25, CUP_RIM_Y + 30, RIGHT_LIMIT - 25, CUP_WALL_BOTTOM_Y - 45, colors.penColor.replace("0.45", "0.1"), 0.8, 0.6);
 
         // Ground shading shadows under cup
         ctx.beginPath();
-        ctx.ellipse(360, 1110, 180, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(360, CUP_FLOOR_Y, 180, 10, 0, 0, Math.PI * 2);
         ctx.strokeStyle = colors.pencilColor.replace("0.35", "0.6");
         ctx.stroke();
         ctx.beginPath();
-        ctx.ellipse(360, 1115, 220, 15, 0, 0, Math.PI * 2);
+        ctx.ellipse(360, CUP_FLOOR_Y + 5, 220, 15, 0, 0, Math.PI * 2);
         ctx.strokeStyle = colors.pencilColor.replace("0.35", "0.4");
         ctx.stroke();
 
         // 3D Glass top rim
         ctx.beginPath();
-        ctx.ellipse(360, 250, 280, 12, 0, 0, Math.PI * 2);
+        ctx.ellipse(360, CUP_RIM_Y, 280, 12, 0, 0, Math.PI * 2);
         ctx.strokeStyle = colors.pencilColor.replace("0.35", "0.95");
         ctx.lineWidth = 2.0;
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.ellipse(360, 250, 277, 9.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(360, CUP_RIM_Y, 277, 9.5, 0, 0, Math.PI * 2);
         ctx.strokeStyle = colors.pencilColor.replace("0.35", "0.5");
         ctx.lineWidth = 1.0;
         ctx.stroke();
@@ -1785,13 +1801,20 @@
         ctx.rotate(cupTiltAngle);
         ctx.translate(-CUP_PIVOT_X, -CUP_PIVOT_Y);
 
-        const pulse = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(Date.now() * 0.008));
-        const laserColor = `rgba(242, 66, 66, ${pulse})`;
+        let laserColor;
+        if (currentMaxDeathTime > 0.0 && !isGameOver) {
+            // Pulse dynamically based on danger severity
+            const pulse = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(Date.now() * 0.008));
+            laserColor = `rgba(242, 66, 66, ${pulse})`;
+        } else {
+            // Solid static red line when no danger
+            laserColor = 'rgba(242, 66, 66, 0.35)';
+        }
 
         ctx.beginPath();
         ctx.setLineDash([10, 6]);
-        ctx.moveTo(80, 250);
-        ctx.lineTo(640, 250);
+        ctx.moveTo(LEFT_LIMIT, CUP_RIM_Y);
+        ctx.lineTo(RIGHT_LIMIT, CUP_RIM_Y);
         ctx.strokeStyle = laserColor;
         ctx.lineWidth = 3.0;
         ctx.stroke();
@@ -1849,14 +1872,16 @@
     function updateHUD() {
         applyHudNum(document.getElementById("score-val"), GameState.score);
         applyHudNum(document.getElementById("highscore-val"), GameState.highscore);
-        // BUG-009 fix: throttle date check — не вызываем new Date() 60 раз в секунду
-        const nowMs = Date.now();
-        if (nowMs - lastDayCheck > 30000) {
-            GameState.resetTodayIfNeeded();
-            lastDayCheck = nowMs;
-        }
-        applyHudNum(document.getElementById("today-val"), GameState.today_best);
-        applyHudNum(document.getElementById("year-val"), GameState.year_best);
+
+        // Реальные локальные рекорды вместо вечных «---»
+        const todayEl = document.getElementById("today-best-val");
+        const yearEl = document.getElementById("year-best-val");
+        if (todayEl) applyHudNum(todayEl, GameState.today_best);
+        if (yearEl) applyHudNum(yearEl, GameState.year_best);
+
+        // Remove 'NEW!' pulse after syncing again if it was there
+        document.getElementById("highscore-val").parentElement.classList.remove("new-record-pulse");
+
         applyHudNum(document.getElementById("coin-val"), GameState.fish_coins);
         updatePlayerChip();
         
@@ -1898,8 +1923,17 @@
     }
 
     function updateAudioButtons() {
-        document.getElementById("sfx-btn").textContent = GameState.sfx_enabled ? "🔊" : "🔇";
-        document.getElementById("music-btn").textContent = GameState.music_enabled ? "🎵" : "⏸️";
+        const sfxText = GameState.sfx_enabled ? "🔊" : "🔇";
+        const sfxBtn = document.getElementById("sfx-btn");
+        const hudSfxBtn = document.getElementById("hud-sfx-btn");
+        if (sfxBtn) sfxBtn.textContent = sfxText;
+        if (hudSfxBtn) hudSfxBtn.textContent = sfxText;
+
+        const musicText = GameState.music_enabled ? "🎵" : "⏸️";
+        const musicBtn = document.getElementById("music-btn");
+        const hudMusicBtn = document.getElementById("hud-music-btn");
+        if (musicBtn) musicBtn.textContent = musicText;
+        if (hudMusicBtn) hudMusicBtn.textContent = musicText;
     }
 
     // --- Game Over Sequence ---
@@ -1940,6 +1974,7 @@
         gameSessionId++;
         isGameOver = false;
         pendingGameOver = false;
+        currentMaxDeathTime = 0;
         lastUndoSnapshot = null;
         isTargetingEraser = false;
         mergingBodyIds.clear();
@@ -1960,7 +1995,6 @@
         particles = [];
         floatingTexts = [];
         devPeekEffect = null;
-        debugEggSpawned = false;
 
         GameState.resetScore();
         startGameMode(currentGameMode);
@@ -1974,11 +2008,11 @@
     }
 
     // --- Camera / Viewport Shake Implementation ---
-    function updateCameraShake() {
+    function updateCameraShake(delta) {
         if (shakeDuration > 0) {
             shakeOffsetX = (Math.random() - 0.5) * shakeIntensity;
             shakeOffsetY = (Math.random() - 0.5) * shakeIntensity;
-            shakeDuration -= 0.016; // 60fps delta approx
+            shakeDuration -= delta; // BUG-D fix: реальное время вместо зашитых 60fps
             if (shakeDuration <= 0) {
                 shakeOffsetX = 0;
                 shakeOffsetY = 0;
@@ -1986,23 +2020,67 @@
         }
     }
 
+    // BUG-D fix: кадронезависимая анимация котов (спавн/сквош). dt60 = 1.0 при 60fps,
+    // поэтому на 60 Гц поведение 1-в-1 прежнее, а на 90/120 Гц не ускоряется.
+    function updateCatVisualAnimation(cat, dt60) {
+        // Пружина масштаба появления/слияния
+        if (cat.spawnScale < 1.0 || cat.scaleVelocity !== 0.0) {
+            const k = 0.12;
+            const damping = 0.8;
+            const force = -k * (cat.spawnScale - 1.0);
+            cat.scaleVelocity = (cat.scaleVelocity + force * dt60) * Math.pow(damping, dt60);
+            cat.spawnScale += cat.scaleVelocity * dt60;
+            if (Math.abs(cat.spawnScale - 1.0) < 0.001 && Math.abs(cat.scaleVelocity) < 0.001) {
+                cat.spawnScale = 1.0;
+                cat.scaleVelocity = 0.0;
+            }
+        }
+
+        // Пружина сквоша (wobble) — оседает к кругу, когда кот замирает
+        const wk = 0.14;
+        const wdamping = 0.82;
+        const wforceX = -wk * (cat.wobbleScaleX - 1.0);
+        cat.wobbleVelocityX = (cat.wobbleVelocityX + wforceX * dt60) * Math.pow(wdamping, dt60);
+        cat.wobbleScaleX += cat.wobbleVelocityX * dt60;
+        const wforceY = -wk * (cat.wobbleScaleY - 1.0);
+        cat.wobbleVelocityY = (cat.wobbleVelocityY + wforceY * dt60) * Math.pow(wdamping, dt60);
+        cat.wobbleScaleY += cat.wobbleVelocityY * dt60;
+
+        const wobbleSpeed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
+        if (wobbleSpeed < 0.35) {
+            const s = 1 - Math.pow(1 - 0.18, dt60);
+            cat.wobbleScaleX += (1.0 - cat.wobbleScaleX) * s;
+            cat.wobbleScaleY += (1.0 - cat.wobbleScaleY) * s;
+        }
+        cat.wobbleScaleX = Math.max(0.94, Math.min(1.06, cat.wobbleScaleX));
+        cat.wobbleScaleY = Math.max(0.94, Math.min(1.06, cat.wobbleScaleY));
+        if (Math.abs(cat.wobbleScaleX - 1) < 0.008) cat.wobbleScaleX = 1;
+        if (Math.abs(cat.wobbleScaleY - 1) < 0.008) cat.wobbleScaleY = 1;
+    }
+
     // --- Main Game Loop (Physics & Animation ticks) ---
     function gameLoop(time) {
-        const delta = (time - lastTime) / 1000.0;
+        const delta = Math.min((time - lastTime) / 1000.0, 0.25); // cap delta to prevent death spiral
+        const dt60 = delta * 60; // 1.0 при 60fps — коэффициент кадронезависимости эффектов
         lastTime = time;
 
         // Step physics engine
         if (!isGameOver) {
-            settleCupIfNeeded(delta);
-            Engine.update(engine, 1000 / 60);
-            clampAllCatsInCup();
-            updateMice(delta);
-            updateDevPeekEffect(delta);
+            physicsAccumulator += delta;
+            const fixedStep = 1.0 / 60.0;
+            while (physicsAccumulator >= fixedStep) {
+                settleCupIfNeeded(fixedStep);
+                Engine.update(engine, 1000 / 60);
+                clampAllCatsInCup();
+                updateMice(fixedStep);
+                updateDevPeekEffect(fixedStep);
+                physicsAccumulator -= fixedStep;
+            }
         }
 
         // Clear draw buffers and offset context for screen shake
         ctx.save();
-        updateCameraShake();
+        updateCameraShake(delta);
         ctx.translate(shakeOffsetX, shakeOffsetY);
 
         // Render Background Gingham & hand-drawn doodles
@@ -2011,11 +2089,11 @@
 
         // Update & Render Particles
         particles.forEach((p, idx) => {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.vy += 0.15; // particle gravity
-            p.alpha -= 0.02;
-            p.life -= 0.02;
+            p.x += p.vx * dt60;
+            p.y += p.vy * dt60;
+            p.vy += 0.15 * dt60; // particle gravity (кадронезависимо)
+            p.alpha -= 0.02 * dt60;
+            p.life -= 0.02 * dt60;
 
             if (p.alpha > 0) {
                 ctx.beginPath();
@@ -2030,9 +2108,9 @@
 
         // Update & Render Floating texts
         floatingTexts.forEach((t, idx) => {
-            t.y += t.ySpeed;
-            t.alpha -= 0.015;
-            t.life -= 0.015;
+            t.y += t.ySpeed * dt60;
+            t.alpha -= 0.015 * dt60;
+            t.life -= 0.015 * dt60;
 
             if (t.alpha > 0) {
                 ctx.fillStyle = t.color;
@@ -2056,44 +2134,14 @@
         activeCats.forEach(cat => {
             drawCatSphere(cat);
 
-            // Spring physics for spawnScale (elastic spawn/merge)
-            if (cat.spawnScale < 1.0 || cat.scaleVelocity !== 0.0) {
-                const k = 0.12;
-                const damping = 0.8;
-                const force = -k * (cat.spawnScale - 1.0);
-                cat.scaleVelocity = (cat.scaleVelocity + force) * damping;
-                cat.spawnScale += cat.scaleVelocity;
-                if (Math.abs(cat.spawnScale - 1.0) < 0.001 && Math.abs(cat.scaleVelocity) < 0.001) {
-                    cat.spawnScale = 1.0;
-                    cat.scaleVelocity = 0.0;
-                }
-            }
-
-            // Spring physics for wobble — settle to round when cat rests
-            const wobbleSpeed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
-            const wk = 0.14;
-            const wdamping = 0.82;
-            const wforceX = -wk * (cat.wobbleScaleX - 1.0);
-            cat.wobbleVelocityX = (cat.wobbleVelocityX + wforceX) * wdamping;
-            cat.wobbleScaleX += cat.wobbleVelocityX;
-            const wforceY = -wk * (cat.wobbleScaleY - 1.0);
-            cat.wobbleVelocityY = (cat.wobbleVelocityY + wforceY) * wdamping;
-            cat.wobbleScaleY += cat.wobbleVelocityY;
-
-            if (wobbleSpeed < 0.35) {
-                cat.wobbleScaleX += (1.0 - cat.wobbleScaleX) * 0.18;
-                cat.wobbleScaleY += (1.0 - cat.wobbleScaleY) * 0.18;
-            }
-            cat.wobbleScaleX = Math.max(0.94, Math.min(1.06, cat.wobbleScaleX));
-            cat.wobbleScaleY = Math.max(0.94, Math.min(1.06, cat.wobbleScaleY));
-            if (Math.abs(cat.wobbleScaleX - 1) < 0.008) cat.wobbleScaleX = 1;
-            if (Math.abs(cat.wobbleScaleY - 1) < 0.008) cat.wobbleScaleY = 1;
+            // Пружины появления/сквоша — кадронезависимо (см. updateCatVisualAnimation)
+            updateCatVisualAnimation(cat, dt60);
 
             // Death zone countdown checking
             if (!isGameOver && cat.isDropped && !cat.isMouse) {
                 const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
                 const localY = worldToCupLocal(cat.body.position.x, cat.body.position.y).y;
-                if (speed < 0.25 && localY < 320) {
+                if (speed < 0.8 && localY < CUP_RIM_Y) {
                     cat.deathZoneTime += delta;
                     if (cat.deathZoneTime > maxDeathTime) {
                         maxDeathTime = cat.deathZoneTime;
@@ -2106,6 +2154,8 @@
                 }
             }
         });
+
+        currentMaxDeathTime = maxDeathTime;
 
         // Pulse warning vignette and red borders dynamically based on time spent in death zone (analog feedback)
         const dangerVig = document.getElementById("danger-vignette");
@@ -2122,33 +2172,9 @@
         // Render Un-dropped cat following guides
         if (currentCat && !isGameOver) {
             drawCatSphere(currentCat);
-            
-            // Spring physics for spawnScale of current preview cat
-            if (currentCat.spawnScale < 1.0 || currentCat.scaleVelocity !== 0.0) {
-                const k = 0.12;
-                const damping = 0.8;
-                const force = -k * (currentCat.spawnScale - 1.0);
-                currentCat.scaleVelocity = (currentCat.scaleVelocity + force) * damping;
-                currentCat.spawnScale += currentCat.scaleVelocity;
-                if (Math.abs(currentCat.spawnScale - 1.0) < 0.001 && Math.abs(currentCat.scaleVelocity) < 0.001) {
-                    currentCat.spawnScale = 1.0;
-                    currentCat.scaleVelocity = 0.0;
-                }
-            }
 
-            // Spring physics for wobble of current preview cat
-            const wk = 0.14;
-            const wdamping = 0.82;
-            const wforceX = -wk * (currentCat.wobbleScaleX - 1.0);
-            currentCat.wobbleVelocityX = (currentCat.wobbleVelocityX + wforceX) * wdamping;
-            currentCat.wobbleScaleX += currentCat.wobbleVelocityX;
-            const wforceY = -wk * (currentCat.wobbleScaleY - 1.0);
-            currentCat.wobbleVelocityY = (currentCat.wobbleVelocityY + wforceY) * wdamping;
-            currentCat.wobbleScaleY += currentCat.wobbleVelocityY;
-            currentCat.wobbleScaleX = Math.max(0.94, Math.min(1.06, currentCat.wobbleScaleX));
-            currentCat.wobbleScaleY = Math.max(0.94, Math.min(1.06, currentCat.wobbleScaleY));
-            if (Math.abs(currentCat.wobbleScaleX - 1) < 0.008) currentCat.wobbleScaleX = 1;
-            if (Math.abs(currentCat.wobbleScaleY - 1) < 0.008) currentCat.wobbleScaleY = 1;
+            // Пружины появления/сквоша текущего кота — тот же кадронезависимый хелпер
+            updateCatVisualAnimation(currentCat, dt60);
         }
 
         drawDevPeekEffect();
@@ -2571,9 +2597,9 @@
         // Submit to local mock storage for web
         submitScoreToMockLeaderboard();
 
-        // Submit to Google Play Games Services natively
-        if (window.PlayGames) {
-            window.PlayGames.submitScore('CgkIxxxxxxxxxxx', GameState.highscore);
+        // Submit to Google Play Games Services natively (только если сервис настроен)
+        if (window.PlayGames && GPGS_LEADERBOARD_ID) {
+            window.PlayGames.submitScore(GPGS_LEADERBOARD_ID, GameState.highscore);
         }
 
         // If real URL is configured, POST to it
@@ -2688,10 +2714,17 @@
             else if (idx === 1) medal = "🥈 ";
             else if (idx === 2) medal = "🥉 ";
 
-            row.innerHTML = `
-                <span>${medal} <strong>${entry.name}</strong></span>
-                <span>${entry.score}</span>
-            `;
+            // Безопасно: строим узлы через textContent, а не innerHTML —
+            // имена из внешнего лидерборда не смогут внедрить HTML/скрипт (XSS).
+            const nameSpan = document.createElement("span");
+            const strong = document.createElement("strong");
+            strong.textContent = entry.name != null ? String(entry.name) : "—";
+            nameSpan.append(medal, strong);
+
+            const scoreSpan = document.createElement("span");
+            scoreSpan.textContent = entry.score != null ? String(entry.score) : "0";
+
+            row.append(nameSpan, scoreSpan);
             listContainer.appendChild(row);
         });
     }
@@ -2801,7 +2834,7 @@
                     btn.textContent = `BUY (🐟 ${price})`;
                     btn.disabled = GameState.fish_coins < price;
                     btn.onclick = () => {
-                        GameState.addFishCoins(-price);
+                        if (!GameState.spendFishCoins(price)) return; // BUG-F: атомарное списание
                         GameState.unlockTheme(tName);
                         GameState.setActiveTheme(tName);
                         updateUIThemeColors(tName);
@@ -2870,7 +2903,7 @@
                     btn.textContent = `BUY (🐟 ${info.cost})`;
                     btn.disabled = GameState.fish_coins < info.cost;
                     btn.onclick = () => {
-                        GameState.addFishCoins(-info.cost);
+                        if (!GameState.spendFishCoins(info.cost)) return; // BUG-F: атомарное списание
                         GameState.unlockSkin(skinId);
                         playMergeSound(1.0);
                         populateShopList();
@@ -2970,7 +3003,7 @@
                     btn.textContent = `BUY (🐟 ${info.cost})`;
                     btn.disabled = GameState.fish_coins < info.cost;
                     btn.onclick = () => {
-                        GameState.addFishCoins(-info.cost);
+                        if (!GameState.spendFishCoins(info.cost)) return; // BUG-F: атомарное списание
                         GameState.unlockSoundSet(soundId);
                         GameState.setActiveSoundSet(soundId);
                         loadSoundSet(soundId);
@@ -3094,9 +3127,7 @@
 
         // Sync header colors
         document.getElementById("score-title-text").style.color = colors.title;
-        document.getElementById("highscore-title-text").style.color = colors.title;
-        document.getElementById("today-title-text").style.color = colors.title;
-        document.getElementById("year-title-text").style.color = colors.title;
+        document.getElementById("highscore-title-text") && (document.getElementById("highscore-title-text").style.color = colors.title);
         document.getElementById("highscore-val").style.color = colors.best;
         document.getElementById("next-title-text").style.color = colors.title;
 
@@ -3105,23 +3136,46 @@
 
     // --- UI Controls event connectors ---
     function connectEvents() {
+        const settingsToggleBtn = document.getElementById("main-menu-btn");
+        const settingsMenu = document.getElementById("settings-menu");
+        
+        if (settingsToggleBtn && settingsMenu) {
+            settingsToggleBtn.onclick = (e) => {
+                e.stopPropagation(); // prevent document click from immediately closing it
+                settingsMenu.classList.toggle("active");
+                playClickSound();
+            };
+            
+            document.addEventListener("click", (e) => {
+                if (!settingsMenu.contains(e.target) && e.target !== settingsToggleBtn) {
+                    settingsMenu.classList.remove("active");
+                }
+            });
+        }
+
         // SFX toggle
-        document.getElementById("sfx-btn").onclick = () => {
+        const toggleSfx = () => {
             unlockAudio();
             GameState.sfx_enabled = !GameState.sfx_enabled;
             GameState.save();
             updateAudioButtons();
             if (GameState.sfx_enabled) playMergeSound(1.0);
         };
+        document.getElementById("sfx-btn").onclick = toggleSfx;
+        const hudSfx = document.getElementById("hud-sfx-btn");
+        if (hudSfx) hudSfx.onclick = toggleSfx;
 
         // Music toggle
-        document.getElementById("music-btn").onclick = () => {
+        const toggleMusic = () => {
             unlockAudio();
             GameState.music_enabled = !GameState.music_enabled;
             GameState.save();
             updateAudioButtons();
             updateBGMState();
         };
+        document.getElementById("music-btn").onclick = toggleMusic;
+        const hudMusic = document.getElementById("hud-music-btn");
+        if (hudMusic) hudMusic.onclick = toggleMusic;
 
         // Help Overlay
         document.getElementById("help-btn").onclick = () => {
@@ -3154,8 +3208,8 @@
         // Leaderboard Overlay
         document.getElementById("leaderboard-btn").onclick = async () => {
             playClickSound();
-            if (window.PlayGames) {
-                const shown = await window.PlayGames.showLeaderboard('CgkIxxxxxxxxxxx');
+            if (window.PlayGames && GPGS_LEADERBOARD_ID) {
+                const shown = await window.PlayGames.showLeaderboard(GPGS_LEADERBOARD_ID);
                 if (shown) return;
             }
             switchLeaderboardTab("alltime");
@@ -3225,8 +3279,9 @@
         if (window.PlayGames) window.PlayGames.init();
         
         window.addEventListener("modalClosedViaBackButton", () => {
-            if (typeof pendingGameOver !== "undefined" && !pendingGameOver && typeof isTargetingEraser !== "undefined" && !isTargetingEraser) {
-                isModalOpen = false;
+            // BUG-A fix: не затираем функцию isModalOpen(); просто восстанавливаем ввод,
+            // если ни одно окно не открыто, игра не окончена и не активен ластик.
+            if (!pendingGameOver && !isTargetingEraser && !isGameOver && !isModalOpen()) {
                 canDrop = true;
             }
         });

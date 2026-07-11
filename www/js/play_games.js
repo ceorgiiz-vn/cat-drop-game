@@ -34,23 +34,16 @@ const PlayGames = (function() {
     }
 
     async function silentSignIn() {
+        // Только тихий вход. Интерактивный логин на старте не навязываем —
+        // он всплывал бы окном при каждом запуске, а при ненастроенном GPGS ещё и падал.
         try {
             const result = await playGamesPlugin.signIn({ silent: true });
-            if (result.isAuthenticated) {
+            if (result && result.isAuthenticated) {
                 isAuthenticated = true;
                 console.log("GPGS: Silently signed in!");
             }
         } catch (e) {
-            console.log("GPGS: Silent sign-in failed, trying interactive.", e);
-            try {
-                const result = await playGamesPlugin.signIn();
-                if (result.isAuthenticated) {
-                    isAuthenticated = true;
-                    console.log("GPGS: Interactively signed in!");
-                }
-            } catch (err) {
-                console.error("GPGS: Interactive sign-in also failed:", err);
-            }
+            console.log("GPGS: Silent sign-in unavailable (GPGS not configured yet).", e);
         }
     }
 

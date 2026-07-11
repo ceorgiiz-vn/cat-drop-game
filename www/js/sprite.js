@@ -91,180 +91,328 @@ const CatSprite = (function() {
         ctx.restore();
     }
 
+    const mouseImg = new Image();
+    mouseImg.src = "assets/sprites/mouse.png";
+
     /** Cartoon mouse — head at −Y, tail at +Y. Use angle π so head points down (falling). */
     function drawMouse(ctx, radius, time, angle, style) {
+        if (mouseImg.complete && mouseImg.naturalWidth) {
+            ctx.save();
+            if (angle) ctx.rotate(angle);
+            
+            // Draw the mouse image centered
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            const r = radius * EDGE_OVERSCALE;
+            ctx.drawImage(mouseImg, -r, -r, r * 2, r * 2);
+            ctx.restore();
+
+            if (style && style.label) {
+                ctx.save();
+                ctx.fillStyle = "rgba(16, 18, 28, 0.82)";
+                ctx.beginPath();
+                ctx.arc(0, radius * 0.08, radius * 0.24, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#ffffff";
+                ctx.font = `bold ${Math.floor(radius * 0.33)}px 'Nunito', sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(style.label, 0, radius * 0.09);
+                ctx.restore();
+            }
+            return;
+        }
+
         const r = radius;
         const t = time || 0;
         const tailWag = Math.sin(t * 0.022) * 0.55;
-        const bodyColor = style && style.bodyColor ? style.bodyColor : "#b0b0b0";
-        const headColor = style && style.headColor ? style.headColor : "#a8a8a8";
-        const earColor = style && style.earColor ? style.earColor : "#f48fb1";
-        const strokeColor = style && style.strokeColor ? style.strokeColor : "#757575";
-        const tailColor = style && style.tailColor ? style.tailColor : "#8d8d8d";
-        const noseColor = style && style.noseColor ? style.noseColor : "#f48fb1";
-        const bootColor = style && style.bootColor ? style.bootColor : "#3b2418";
-        const swordColor = style && style.swordColor ? style.swordColor : "#dce7ff";
-        const swordGlow = style && style.swordGlow ? style.swordGlow : "#8fd3ff";
-        const hatColor = style && style.hatColor ? style.hatColor : "#5d4037";
-        const featherColor = style && style.featherColor ? style.featherColor : "#f9c74f";
+
+        // Custom colors for Puss-in-Boots mouse
+        const bodyColor = "#e67e22"; // Orange tabby fur
+        const stripeColor = "#d35400"; // Darker orange stripes
+        const bellyColor = "#f39c12"; // Golden belly
+        const earColor = "#ff8a80"; // Soft pink inner ear
+        const strokeColor = "#3e2723"; // Dark brown outlines
+        const bootColor = "#2c3e50"; // Dark navy/leather boots
+        const bootCuffColor = "#34495e";
+        const hatColor = "#1a1a1a"; // Sleek black musketeer hat
+        const featherColor = "#f1c40f"; // Rich gold feather
+        const swordColor = "#ecf0f1"; // Silver steel
+        const swordGlow = "#54a0ff"; // Blue energy glow
 
         ctx.save();
         if (angle) ctx.rotate(angle);
 
-        // Tail (behind body, wags)
+        // 1. Tail (behind body, wags)
         ctx.save();
-        ctx.translate(0, r * 0.55);
+        ctx.translate(0, r * 0.5);
         ctx.rotate(tailWag);
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(r * 0.35, r * 0.45, r * 0.15, r * 1.05);
-        ctx.quadraticCurveTo(-r * 0.1, r * 1.35, -r * 0.05, r * 1.65);
-        ctx.strokeStyle = tailColor;
-        ctx.lineWidth = Math.max(2.5, r * 0.14);
+        ctx.quadraticCurveTo(r * 0.35, r * 0.45, r * 0.2, r * 1.05);
+        ctx.quadraticCurveTo(-r * 0.1, r * 1.35, -r * 0.05, r * 1.6);
+        ctx.strokeStyle = bodyColor;
+        ctx.lineWidth = Math.max(3, r * 0.15);
         ctx.lineCap = "round";
+        ctx.stroke();
+        // Tail stripe details
+        ctx.strokeStyle = stripeColor;
+        ctx.lineWidth = Math.max(1.5, r * 0.07);
         ctx.stroke();
         ctx.restore();
 
-        // Body
+        // 2. Boots (at the bottom)
+        ctx.fillStyle = bootColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = Math.max(1.5, r * 0.045);
+        [[-r * 0.28, r * 0.52, -0.15], [r * 0.28, r * 0.52, 0.15]].forEach(([px, py, rot]) => {
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(rot);
+            // Boot foot
+            ctx.beginPath();
+            ctx.ellipse(0, r * 0.05, r * 0.18, r * 0.1, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            // Folded boot cuff
+            ctx.fillStyle = bootCuffColor;
+            ctx.beginPath();
+            ctx.ellipse(0, -r * 0.05, r * 0.15, r * 0.07, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        });
+
+        // 3. Body
         ctx.fillStyle = bodyColor;
         ctx.beginPath();
         ctx.ellipse(0, r * 0.08, r * 0.62, r * 0.48, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = Math.max(1.5, r * 0.05);
+        ctx.lineWidth = Math.max(2, r * 0.055);
         ctx.stroke();
 
-        // Head
-        ctx.fillStyle = headColor;
+        // Golden/light belly patch
+        ctx.fillStyle = bellyColor;
+        ctx.beginPath();
+        ctx.ellipse(0, r * 0.18, r * 0.38, r * 0.25, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Tabby stripes on body sides
+        ctx.strokeStyle = stripeColor;
+        ctx.lineWidth = Math.max(2, r * 0.06);
+        ctx.lineCap = "round";
+        [[-r * 0.5, r * 0.1, 0.4], [r * 0.5, r * 0.1, -0.4]].forEach(([sx, sy, rot]) => {
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(rot);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(r * 0.15, 0);
+            ctx.stroke();
+            ctx.restore();
+        });
+
+        // 4. Head
+        ctx.fillStyle = bodyColor;
         ctx.beginPath();
         ctx.arc(0, -r * 0.38, r * 0.38, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
 
-        // Ears
+        // Tabby stripes on forehead
+        ctx.strokeStyle = stripeColor;
+        ctx.lineWidth = Math.max(1.5, r * 0.04);
+        [[-r * 0.08, -r * 0.65], [0, -r * 0.68], [r * 0.08, -r * 0.65]].forEach(([sx, sy]) => {
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx, sy + r * 0.1);
+            ctx.stroke();
+        });
+
+        // 5. Large Mouse/Cat Ears
         function ear(ex, tipX, tipY) {
-            ctx.fillStyle = headColor;
+            ctx.fillStyle = bodyColor;
             ctx.beginPath();
             ctx.moveTo(ex, -r * 0.55);
             ctx.lineTo(tipX, tipY);
-            ctx.lineTo(ex + (ex > 0 ? r * 0.18 : -r * 0.18), -r * 0.42);
+            ctx.lineTo(ex + (ex > 0 ? r * 0.2 : -r * 0.2), -r * 0.42);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
+
+            // Inner Ear (Pink)
             ctx.fillStyle = earColor;
             ctx.beginPath();
             ctx.moveTo(ex, -r * 0.52);
-            ctx.lineTo(tipX * 0.85, tipY * 0.85);
-            ctx.lineTo(ex + (ex > 0 ? r * 0.12 : -r * 0.12), -r * 0.44);
+            ctx.lineTo(tipX * 0.88, tipY * 0.88);
+            ctx.lineTo(ex + (ex > 0 ? r * 0.14 : -r * 0.14), -r * 0.44);
             ctx.closePath();
             ctx.fill();
         }
         ear(-r * 0.28, -r * 0.52, -r * 0.92);
         ear(r * 0.28, r * 0.52, -r * 0.92);
 
-        // Tiny musketeer hat
+        // 6. Huge Musketeer Hat (curved brim, golden feather)
         ctx.fillStyle = hatColor;
-        ctx.beginPath();
-        ctx.ellipse(0, -r * 0.78, r * 0.34, r * 0.11, -0.08, 0, Math.PI * 2);
-        ctx.fill();
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = Math.max(1.4, r * 0.045);
-        ctx.stroke();
+        ctx.lineWidth = Math.max(2, r * 0.05);
+
+        // Hat dome
         ctx.beginPath();
-        ctx.moveTo(-r * 0.22, -r * 0.8);
-        ctx.quadraticCurveTo(0, -r * 1.04, r * 0.22, -r * 0.8);
+        ctx.moveTo(-r * 0.26, -r * 0.78);
+        ctx.quadraticCurveTo(0, -r * 1.05, r * 0.26, -r * 0.78);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.strokeStyle = featherColor;
-        ctx.lineWidth = Math.max(1.4, r * 0.055);
+
+        // Curled brim (larger and stylish)
         ctx.beginPath();
-        ctx.moveTo(r * 0.16, -r * 0.9);
-        ctx.quadraticCurveTo(r * 0.46, -r * 1.18, r * 0.24, -r * 1.34);
+        ctx.ellipse(0, -r * 0.75, r * 0.48, r * 0.12, -0.06, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
 
-        // Eyes
-        ctx.fillStyle = "#1a1a1a";
+        // Plume / Feather
+        ctx.strokeStyle = featherColor;
+        ctx.lineWidth = Math.max(3, r * 0.09);
         ctx.beginPath();
-        ctx.arc(-r * 0.14, -r * 0.42, r * 0.07, 0, Math.PI * 2);
-        ctx.arc(r * 0.14, -r * 0.42, r * 0.07, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#fff";
-        ctx.beginPath();
-        ctx.arc(-r * 0.12, -r * 0.44, r * 0.025, 0, Math.PI * 2);
-        ctx.arc(r * 0.16, -r * 0.44, r * 0.025, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(-r * 0.15, -r * 0.85);
+        ctx.quadraticCurveTo(-r * 0.45, -r * 1.15, -r * 0.2, -r * 1.35);
+        ctx.stroke();
 
-        // Nose & whiskers
-        ctx.fillStyle = noseColor;
-        ctx.beginPath();
-        ctx.arc(0, -r * 0.28, r * 0.06, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(80,80,80,0.55)";
-        ctx.lineWidth = 1;
-        [-1, 1].forEach(side => {
+        // 7. Expressive Puss-in-Boots Green Eyes
+        ctx.fillStyle = "#ffffff";
+        [[-r * 0.14, -r * 0.42], [r * 0.14, -r * 0.42]].forEach(([ex, ey]) => {
             ctx.beginPath();
-            ctx.moveTo(side * r * 0.06, -r * 0.28);
-            ctx.lineTo(side * r * 0.55, -r * 0.32);
-            ctx.moveTo(side * r * 0.06, -r * 0.24);
-            ctx.lineTo(side * r * 0.58, -r * 0.22);
+            ctx.arc(ex, ey, r * 0.09, 0, Math.PI * 2);
+            ctx.fill();
             ctx.stroke();
         });
 
-        // Needle rapier and paw grip
-        ctx.save();
-        ctx.lineCap = "round";
-        ctx.strokeStyle = swordGlow;
-        ctx.globalAlpha = 0.45;
-        ctx.lineWidth = Math.max(3, r * 0.13);
-        ctx.beginPath();
-        ctx.moveTo(r * 0.1, -r * 0.36);
-        ctx.lineTo(0, -r * 1.72);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = swordColor;
-        ctx.lineWidth = Math.max(1.6, r * 0.045);
-        ctx.beginPath();
-        ctx.moveTo(r * 0.1, -r * 0.36);
-        ctx.lineTo(0, -r * 1.72);
-        ctx.stroke();
-        ctx.strokeStyle = "#f8fbff";
-        ctx.lineWidth = Math.max(1, r * 0.02);
-        ctx.beginPath();
-        ctx.moveTo(r * 0.08, -r * 0.48);
-        ctx.lineTo(r * 0.01, -r * 1.55);
-        ctx.stroke();
-        ctx.strokeStyle = "#f9c74f";
-        ctx.lineWidth = Math.max(1.5, r * 0.06);
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.14, -r * 0.54);
-        ctx.lineTo(r * 0.22, -r * 0.5);
-        ctx.stroke();
+        // Vibrant Green Iris
+        ctx.fillStyle = "#2ecc71";
+        [[-r * 0.14, -r * 0.42], [r * 0.14, -r * 0.42]].forEach(([ex, ey]) => {
+            ctx.beginPath();
+            ctx.arc(ex, ey, r * 0.065, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Large pupils & highlights
+        ctx.fillStyle = "#1a1a1a";
+        [[-r * 0.14, -r * 0.42], [r * 0.14, -r * 0.42]].forEach(([ex, ey]) => {
+            ctx.beginPath();
+            ctx.arc(ex, ey, r * 0.045, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.fillStyle = "#ffffff";
+        [[-r * 0.11, -r * 0.45], [r * 0.17, -r * 0.45]].forEach(([ex, ey]) => {
+            ctx.beginPath();
+            ctx.arc(ex, ey, r * 0.02, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Cute pink nose & whiskers
         ctx.fillStyle = earColor;
         ctx.beginPath();
-        ctx.arc(r * 0.12, -r * 0.38, r * 0.09, 0, Math.PI * 2);
+        ctx.moveTo(-r * 0.04, -r * 0.29);
+        ctx.lineTo(r * 0.04, -r * 0.29);
+        ctx.lineTo(0, -r * 0.25);
+        ctx.closePath();
         ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(62,39,35,0.45)";
+        ctx.lineWidth = 1;
+        [[-1, -r * 0.04], [1, r * 0.04]].forEach(([side, wx]) => {
+            ctx.beginPath();
+            ctx.moveTo(wx, -r * 0.27);
+            ctx.lineTo(side * r * 0.45, -r * 0.3);
+            ctx.moveTo(wx, -r * 0.25);
+            ctx.lineTo(side * r * 0.48, -r * 0.22);
+            ctx.stroke();
+        });
+
+        // Left paw (shielding or resting on side)
+        ctx.fillStyle = bodyColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = Math.max(1.5, r * 0.045);
+        ctx.beginPath();
+        ctx.arc(-r * 0.35, r * 0.32, r * 0.09, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 8. Swashbuckler Heroic OUTSTRETCHED ARM (Right)
+        ctx.save();
+        ctx.fillStyle = bodyColor;
+        ctx.beginPath();
+        ctx.moveTo(r * 0.3, -r * 0.1);
+        ctx.quadraticCurveTo(r * 0.7, -r * 0.3, r * 0.32, -r * 0.52);
+        ctx.lineTo(r * 0.22, -r * 0.42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Large gold/white sleeve cuff
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.ellipse(r * 0.35, -r * 0.48, r * 0.11, r * 0.065, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Heroic paw gripping the sword
+        ctx.fillStyle = bodyColor;
+        ctx.beginPath();
+        ctx.arc(r * 0.32, -r * 0.48, r * 0.07, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
         ctx.restore();
 
-        // Tiny paws
-        ctx.fillStyle = earColor;
-        [[-r * 0.35, r * 0.38], [r * 0.35, r * 0.38]].forEach(([px, py]) => {
-            ctx.beginPath();
-            ctx.arc(px, py, r * 0.09, 0, Math.PI * 2);
-            ctx.fill();
-        });
+        // 9. Silver Sword Rapier (aligned directly with physical sword detector)
+        // Physics segment is vertical from center (bx: x, by: y + reach).
+        // In local coordinates: from (0, -r * 0.4) extending straight UP to (0, -r * 1.75).
+        ctx.save();
+        ctx.lineCap = "round";
 
-        // Boots
-        ctx.fillStyle = bootColor;
-        [[-r * 0.28, r * 0.5, -0.2], [r * 0.28, r * 0.5, 0.2]].forEach(([px, py, rot]) => {
-            ctx.beginPath();
-            ctx.ellipse(px, py, r * 0.17, r * 0.09, rot, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = strokeColor;
-            ctx.lineWidth = Math.max(1, r * 0.035);
-            ctx.stroke();
-        });
+        // Outer glow
+        ctx.strokeStyle = swordGlow;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = Math.max(3, r * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.42);
+        ctx.lineTo(0, -r * 1.76);
+        ctx.stroke();
 
+        // Silver blade
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = swordColor;
+        ctx.lineWidth = Math.max(1.8, r * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.42);
+        ctx.lineTo(0, -r * 1.76);
+        ctx.stroke();
+
+        // Highlight line on blade
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = Math.max(1, r * 0.02);
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.01, -r * 0.5);
+        ctx.lineTo(-r * 0.01, -r * 1.6);
+        ctx.stroke();
+
+        // Golden Sword Guard / Hilt
+        ctx.strokeStyle = strokeColor;
+        ctx.fillStyle = "#f1c40f";
+        ctx.lineWidth = Math.max(1.5, r * 0.045);
+        ctx.beginPath();
+        // Curved basket guard
+        ctx.arc(0, -r * 0.42, r * 0.16, Math.PI, 0);
+        ctx.stroke();
+        ctx.fill();
+
+        ctx.restore();
         ctx.restore();
 
         if (style && style.label) {

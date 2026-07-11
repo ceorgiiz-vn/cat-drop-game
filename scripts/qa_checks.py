@@ -128,14 +128,17 @@ def check_game_timing():
 
 
 def check_css_preview_circle():
+    # Обновлено под текущую вёрстку HUD (split-раскладка + резиновые плашки от --gw).
     path = os.path.join(ROOT, "style.css")
     text = open(path, encoding="utf-8").read()
     html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
-    if "hud-top-bar" not in text:
-        return fail("style.css: missing unified hud-top-bar")
-    if "hud-center" not in text or "modal-content-scroll" not in html or "evolution-grid" not in text:
-        return fail("style.css/index.html: HUD needs center cell and scrollable evolution grid")
-    return ok("CSS top HUD bar + circular next preview")
+    if "hud-top-split" not in text or "hud-top-split" not in html:
+        return fail("style.css/index.html: HUD needs the split top layout (hud-top-split)")
+    if "--hud-plate-w" not in text:
+        return fail("style.css: HUD plates must scale from --gw (missing --hud-plate-w)")
+    if "modal-content-scroll" not in html or "evolution-grid" not in text:
+        return fail("style.css/index.html: needs scrollable evolution grid")
+    return ok("CSS responsive HUD (split layout + --gw-scaled plates)")
 
 
 def check_release_payload_clean():
