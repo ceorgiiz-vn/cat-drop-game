@@ -2066,15 +2066,19 @@
 
         // Step physics engine
         if (!isGameOver) {
-            physicsAccumulator += delta;
-            const fixedStep = 1.0 / 60.0;
-            while (physicsAccumulator >= fixedStep) {
-                settleCupIfNeeded(fixedStep);
-                Engine.update(engine, 1000 / 60);
+            // Decouple physics from render frame rate correctly:
+            // Step physics by the exact frame delta, but cap the step size to 1/60s (approx 16.67ms)
+            // to maintain Matter.js physics stability (prevents clipping through walls during lags).
+            let timeRemaining = delta;
+            const maxStep = 1.0 / 60.0;
+            while (timeRemaining > 0.0001) {
+                const stepSize = Math.min(timeRemaining, maxStep);
+                settleCupIfNeeded(stepSize);
+                Engine.update(engine, stepSize * 1000);
                 clampAllCatsInCup();
-                updateMice(fixedStep);
-                updateDevPeekEffect(fixedStep);
-                physicsAccumulator -= fixedStep;
+                updateMice(stepSize);
+                updateDevPeekEffect(stepSize);
+                timeRemaining -= stepSize;
             }
         }
 
@@ -2181,9 +2185,7 @@
 
         ctx.restore(); // restore shake offsets
 
-        // Sync DOM numbers
-        updateHUD();
-
+        // Sync DOM numbers only on state change (already wired to GameState.onStateChange)
         requestAnimationFrame(gameLoop);
     }
 
@@ -3297,6 +3299,7 @@
             if (gameBooted) return;
             gameBooted = true;
 
+            GameState.onStateChange = updateHUD;
             loadSoundSet(GameState.active_sound_set);
             updateAudioButtons();
             connectEvents();

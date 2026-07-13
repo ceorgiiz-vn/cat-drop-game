@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v115'; // bumped: new custom mouse sprite added
+const CACHE_NAME = 'cat-drop-v116'; // bumped: 60Hz/120Hz/240Hz physics sub-stepping loop and HUD performance update
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',

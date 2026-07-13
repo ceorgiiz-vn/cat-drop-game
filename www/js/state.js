@@ -19,6 +19,12 @@ const GameState = {
     sfx_enabled: true,
     music_enabled: true,
     google_sheets_url: "",
+    onStateChange: null,
+    triggerStateChange() {
+        if (typeof this.onStateChange === 'function') {
+            this.onStateChange();
+        }
+    },
 
     /** Visual + physics scale for all cats (1.0 = original APK sizes). */
     CAT_SIZE_SCALE: 1.125,
@@ -109,6 +115,7 @@ const GameState = {
             music_enabled: this.music_enabled
         };
         localStorage.setItem("cat_drop_save_data", JSON.stringify(data));
+        this.triggerStateChange();
     },
 
     getTodayKey() {
@@ -168,11 +175,14 @@ const GameState = {
         this.updateBestScores(this.score);
         if (this.highscore !== beforeHigh || this.today_best !== beforeToday || this.year_best !== beforeYear) {
             this.save();
+        } else {
+            this.triggerStateChange();
         }
     },
 
     resetScore() {
         this.score = 0;
+        this.triggerStateChange();
     },
 
     setPlayerName(name) {

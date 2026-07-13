@@ -124,7 +124,19 @@ def check_game_timing():
         return fail("dev peek duration should be 2.5s")
     if "mouthY" not in text or "mouthX" not in text:
         return fail("speech bubble should anchor to mouthX/mouthY")
-    return ok("game.js dev peek timing + release flags")
+
+    # Verify gameLoop does not call updateHUD every frame (prevent layout thrashing)
+    loop_start = text.find("function gameLoop(")
+    loop_end = text.find("function getInternalCoordinates", loop_start)
+    loop_code = text[loop_start:loop_end]
+    if "updateHUD()" in loop_code:
+        return fail("game.js: gameLoop must not call updateHUD() directly on every frame (performance thrashing)")
+    
+    # Verify sub-stepping is present
+    if "timeRemaining" not in loop_code or "maxStep" not in loop_code:
+        return fail("game.js: physics loop must use frame-time sub-stepping ('timeRemaining' and 'maxStep')")
+
+    return ok("game.js dev peek timing + release flags + sub-stepped framerate-independent physics loop")
 
 
 def check_css_preview_circle():
