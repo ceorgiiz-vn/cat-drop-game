@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v116'; // bumped: 60Hz/120Hz/240Hz physics sub-stepping loop and HUD performance update
+const CACHE_NAME = 'cat-drop-v117'; // bumped: golden ball x2 symbol and needle booster asset
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',
@@ -16,7 +16,7 @@ const SPRITE_FILES = [
   './assets/sprites/skin_vampire.png',
   './assets/sprites/skin_bard.png',
   './assets/sprites/skin_oldman.png',
-  './assets/sprites/mouse.png',
+  './assets/sprites/needle.png',
 ];
 
 const ASSETS_TO_CACHE = [

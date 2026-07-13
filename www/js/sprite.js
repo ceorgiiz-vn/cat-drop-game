@@ -66,10 +66,10 @@ const CatSprite = (function() {
         ctx.fill();
 
         ctx.fillStyle = "#8b6914";
-        ctx.font = `bold ${Math.floor(r * 0.55)}px 'Nunito', sans-serif`;
+        ctx.font = `bold ${Math.floor(r * 0.48)}px 'Nunito', sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("?", 0, r * 0.05);
+        ctx.fillText("X2", 0, r * 0.05);
     }
 
     function renderPreview(canvas, img, diameter, fitScale = 0.9) {
@@ -92,7 +92,7 @@ const CatSprite = (function() {
     }
 
     const mouseImg = new Image();
-    mouseImg.src = "assets/sprites/mouse.png";
+    mouseImg.src = "assets/sprites/needle.png";
 
     /** Cartoon mouse — head at −Y, tail at +Y. Use angle π so head points down (falling). */
     function drawMouse(ctx, radius, time, angle, style) {
@@ -100,19 +100,17 @@ const CatSprite = (function() {
             ctx.save();
             if (angle) ctx.rotate(angle);
             
-            // Draw the mouse image in full, without clipping it to a circle
+            // Draw the needle image in full
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
             
-            // Adjust visual size to fit nicely in the game without cropping
-            // Mouse should look slightly bigger visually but still keep its correct physics body
-            const scale = 1.35;
-            const drawW = radius * 2 * scale;
-            const drawH = (mouseImg.naturalHeight / mouseImg.naturalWidth) * drawW;
+            // Scale the silver needle height dynamically so it is exactly 4x its physics radius,
+            // which visually matches the diameter of a level 4 cat (orange cat) while remaining responsive.
+            const drawH = radius * 4.0;
+            const drawW = drawH / (mouseImg.naturalHeight / mouseImg.naturalWidth);
             
-            // Draw centered, adjusting offset slightly upwards to align physics center with the mouse body center
-            // (the feather/hat makes the image taller at the top)
-            ctx.drawImage(mouseImg, -drawW / 2, -drawH / 2 + (drawH * 0.08), drawW, drawH);
+            // Draw centered perfectly since the needle is symmetric
+            ctx.drawImage(mouseImg, -drawW / 2, -drawH / 2, drawW, drawH);
             ctx.restore();
 
             if (style && style.label) {
