@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v117'; // bumped: golden ball x2 symbol and needle booster asset
+const CACHE_NAME = 'cat-drop-v118'; // bumped: seamless cup colliders physics update
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',

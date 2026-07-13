@@ -169,19 +169,19 @@
     let cupRightCorner = null;
     let cupFloor = null;
 
-    const CUP_WALL_LEFT_X = 90;
-    const CUP_WALL_RIGHT_X = 630;
+    const CUP_WALL_LEFT_X = 85;
+    const CUP_WALL_RIGHT_X = 635;
     const CUP_WALL_BOTTOM_Y = 1075 + GAME_Y_OFFSET;
     const CUP_CORNER_LEFT_A = { x: 80, y: 1075 + GAME_Y_OFFSET };
     const CUP_CORNER_LEFT_B = { x: 110, y: 1098 + GAME_Y_OFFSET };
     const CUP_CORNER_RIGHT_A = { x: 610, y: 1098 + GAME_Y_OFFSET };
     const CUP_CORNER_RIGHT_B = { x: 640, y: 1075 + GAME_Y_OFFSET };
     const CUP_FLOOR_X = 360;
-    const CUP_FLOOR_Y = 1110 + GAME_Y_OFFSET;
+    const CUP_FLOOR_Y = 1115 + GAME_Y_OFFSET;
     const CUP_PIVOT_X = 360;
     const CUP_PIVOT_Y = 1060 + GAME_Y_OFFSET; // pivot near cup base
-    const WALL_CORNER_OVERLAP = 10;
-    const CORNER_THICKNESS = 22;
+    const WALL_CORNER_OVERLAP = 25;
+    const CORNER_THICKNESS = 32;
     const LEFT_CORNER_ANGLE = Math.atan2(CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y, CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x);
     const RIGHT_CORNER_ANGLE = Math.atan2(CUP_CORNER_RIGHT_B.y - CUP_CORNER_RIGHT_A.y, CUP_CORNER_RIGHT_B.x - CUP_CORNER_RIGHT_A.x);
     const LEFT_CORNER_CENTER = {
@@ -192,7 +192,7 @@
         x: (CUP_CORNER_RIGHT_A.x + CUP_CORNER_RIGHT_B.x) / 2,
         y: (CUP_CORNER_RIGHT_A.y + CUP_CORNER_RIGHT_B.y) / 2
     };
-    const CORNER_LENGTH = Math.hypot(CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x, CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y) + 18;
+    const CORNER_LENGTH = Math.hypot(CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x, CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y) + 30;
 
     function rotatePoint(px, py, angle) {
         const dx = px - CUP_PIVOT_X;
@@ -290,12 +290,12 @@
         // dropped into the corner can settle instead of riding a diagonal ramp.
         const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_CORNER_OVERLAP;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
-        cupLeftWall = Bodies.rectangle(CUP_WALL_LEFT_X, wallCenterY, 20, wallHeight, { 
+        cupLeftWall = Bodies.rectangle(CUP_WALL_LEFT_X, wallCenterY, 30, wallHeight, { 
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
         });
-        cupRightWall = Bodies.rectangle(CUP_WALL_RIGHT_X, wallCenterY, 20, wallHeight, { 
+        cupRightWall = Bodies.rectangle(CUP_WALL_RIGHT_X, wallCenterY, 30, wallHeight, { 
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
@@ -312,7 +312,7 @@
             friction: CatPhysics.WALL_FRICTION,
             restitution: CatPhysics.WALL_RESTITUTION
         });
-        cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, 560, 20, { 
+        cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, 590, 30, { 
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
