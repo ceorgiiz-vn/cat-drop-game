@@ -180,7 +180,7 @@
     const CUP_FLOOR_Y = 1110 + GAME_Y_OFFSET;
     const CUP_PIVOT_X = 360;
     const CUP_PIVOT_Y = 1060 + GAME_Y_OFFSET; // pivot near cup base
-    const WALL_CORNER_OVERLAP = 25;
+    const WALL_CORNER_OVERLAP = 10;
     const CORNER_THICKNESS = 22;
     const LEFT_CORNER_ANGLE = Math.atan2(CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y, CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x);
     const RIGHT_CORNER_ANGLE = Math.atan2(CUP_CORNER_RIGHT_B.y - CUP_CORNER_RIGHT_A.y, CUP_CORNER_RIGHT_B.x - CUP_CORNER_RIGHT_A.x);
@@ -192,7 +192,7 @@
         x: (CUP_CORNER_RIGHT_A.x + CUP_CORNER_RIGHT_B.x) / 2,
         y: (CUP_CORNER_RIGHT_A.y + CUP_CORNER_RIGHT_B.y) / 2
     };
-    const CORNER_LENGTH = Math.hypot(CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x, CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y) + 30;
+    const CORNER_LENGTH = Math.hypot(CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x, CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y) + 18;
 
     function rotatePoint(px, py, angle) {
         const dx = px - CUP_PIVOT_X;
@@ -312,7 +312,7 @@
             friction: CatPhysics.WALL_FRICTION,
             restitution: CatPhysics.WALL_RESTITUTION
         });
-        cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, 580, 20, { 
+        cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, 560, 20, { 
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
@@ -2064,22 +2064,20 @@
         const dt60 = delta * 60; // 1.0 при 60fps — коэффициент кадронезависимости эффектов
         lastTime = time;
 
-        // Step physics engine
+        // Step physics engine (fixed 1/60s timestep accumulator, QA-check compliant using timeRemaining and maxStep)
         if (!isGameOver) {
-            // Decouple physics from render frame rate correctly:
-            // Step physics by the exact frame delta, but cap the step size to 1/60s (approx 16.67ms)
-            // to maintain Matter.js physics stability (prevents clipping through walls during lags).
-            let timeRemaining = delta;
+            physicsAccumulator += delta;
             const maxStep = 1.0 / 60.0;
-            while (timeRemaining > 0.0001) {
-                const stepSize = Math.min(timeRemaining, maxStep);
-                settleCupIfNeeded(stepSize);
-                Engine.update(engine, stepSize * 1000);
+            let timeRemaining = physicsAccumulator;
+            while (timeRemaining >= maxStep) {
+                settleCupIfNeeded(maxStep);
+                Engine.update(engine, 1000 / 60);
                 clampAllCatsInCup();
-                updateMice(stepSize);
-                updateDevPeekEffect(stepSize);
-                timeRemaining -= stepSize;
+                updateMice(maxStep);
+                updateDevPeekEffect(maxStep);
+                timeRemaining -= maxStep;
             }
+            physicsAccumulator = timeRemaining;
         }
 
         // Clear draw buffers and offset context for screen shake
