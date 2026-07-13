@@ -1001,8 +1001,12 @@
     }
 
     function getClampedX(x, radius) {
-        // Add 5 pixels padding so it doesn't touch the walls and bounce diagonally on drop
-        return Math.max(LEFT_LIMIT + radius + 5, Math.min(RIGHT_LIMIT - radius - 5, x));
+        // Clamp to actual inner walls (Left inner face: 100, Right inner face: 620) with 5px padding
+        const innerLeft = CUP_WALL_LEFT_X + 10;
+        const innerRight = CUP_WALL_RIGHT_X - 10;
+        const minSpawnX = innerLeft + radius + 5;
+        const maxSpawnX = innerRight - radius - 5;
+        return Math.max(minSpawnX, Math.min(maxSpawnX, x));
     }
 
     function getCatColliderRadius(cat) {
@@ -1034,15 +1038,18 @@
         let y = pos.y;
         let needsReset = false;
 
-        if (x < LEFT_LIMIT - r) {
-            x = LEFT_LIMIT + r + 5;
+        const innerLeft = CUP_WALL_LEFT_X + 10;
+        const innerRight = CUP_WALL_RIGHT_X - 10;
+
+        if (x < innerLeft - r - 20) {
+            x = innerLeft + r + 5;
             needsReset = true;
         }
-        if (x > RIGHT_LIMIT + r) {
-            x = RIGHT_LIMIT - r - 5;
+        if (x > innerRight + r + 20) {
+            x = innerRight - r - 5;
             needsReset = true;
         }
-        if (y > FLOOR_TOP_Y + r) {
+        if (y > FLOOR_TOP_Y + r + 20) {
             y = FLOOR_TOP_Y - r - 5;
             needsReset = true;
         }

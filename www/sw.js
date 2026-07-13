@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v121'; // bumped: rewrite clampCatInCup to safety net and fix corner spinning
+const CACHE_NAME = 'cat-drop-v122'; // bumped: clamp drop spawn position strictly to inner walls
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',
