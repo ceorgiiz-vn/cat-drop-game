@@ -1012,38 +1012,7 @@
     function clampCatInCup(cat) {
         if (!cat.isDropped || cat.body.isStatic) return;
 
-        if (Math.abs(cupTiltAngle) > 0.02) {
-            const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
-            if (speed > CatPhysics.MAX_CAT_SPEED) {
-                const scale = CatPhysics.MAX_CAT_SPEED / speed;
-                Body.setVelocity(cat.body, {
-                    x: cat.body.velocity.x * scale,
-                    y: cat.body.velocity.y * scale
-                });
-            }
-            return;
-        }
-
-        const r = cat.isMouse ? getMouseColliderRadius(cat) : getCatColliderRadius(cat);
-        const minX = LEFT_LIMIT + r;
-        const maxX = RIGHT_LIMIT - r;
-        const maxY = FLOOR_TOP_Y - r;
-        const pos = cat.body.position;
-        let x = pos.x;
-        let y = pos.y;
-        let clampedX = false;
-
-        if (x < minX) { x = minX; clampedX = true; }
-        if (x > maxX) { x = maxX; clampedX = true; }
-        if (y > maxY) y = maxY;
-
-        if (x !== pos.x || y !== pos.y) {
-            Body.setPosition(cat.body, { x, y });
-        }
-        if (clampedX) {
-            Body.setVelocity(cat.body, { x: 0, y: cat.body.velocity.y });
-        }
-
+        // 1. Cap maximum speed to prevent clipping/flying out during high-impact collisions
         const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
         if (speed > CatPhysics.MAX_CAT_SPEED) {
             const scale = CatPhysics.MAX_CAT_SPEED / speed;
@@ -1053,10 +1022,34 @@
             });
         }
 
-        // BUG-016 fix: угловое демпфирование только для котиков, не для мышей
-        // Предотвращает бесконечное кручение в углах стакана
+        // 2. Apply angular damping to prevent infinite spinning in corners
         if (!cat.isMouse) {
             Body.setAngularVelocity(cat.body, cat.body.angularVelocity * 0.94);
+        }
+
+        // 3. Out-of-bounds safety net: only teleport if the cat has genuinely glitched past the cup boundaries
+        const r = cat.isMouse ? getMouseColliderRadius(cat) : getCatColliderRadius(cat);
+        const pos = cat.body.position;
+        let x = pos.x;
+        let y = pos.y;
+        let needsReset = false;
+
+        if (x < LEFT_LIMIT - r) {
+            x = LEFT_LIMIT + r + 5;
+            needsReset = true;
+        }
+        if (x > RIGHT_LIMIT + r) {
+            x = RIGHT_LIMIT - r - 5;
+            needsReset = true;
+        }
+        if (y > FLOOR_TOP_Y + r) {
+            y = FLOOR_TOP_Y - r - 5;
+            needsReset = true;
+        }
+
+        if (needsReset) {
+            Body.setPosition(cat.body, { x, y });
+            Body.setVelocity(cat.body, { x: 0, y: 0 });
         }
     }
 

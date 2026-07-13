@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v120'; // bumped: fix cat bouncing physics loop and cup overlaps
+const CACHE_NAME = 'cat-drop-v121'; // bumped: rewrite clampCatInCup to safety net and fix corner spinning
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',
