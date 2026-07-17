@@ -13,7 +13,6 @@ const PlayGames = (function() {
 
     async function init() {
         if (!isCapacitor()) {
-            console.log("PlayGames: Not running in native Capacitor environment. Mocking GPGS.");
             return;
         }
 
@@ -33,20 +32,24 @@ const PlayGames = (function() {
         }
     }
 
-    async function silentSignIn() {
-        // Только тихий вход. Интерактивный логин на старте не навязываем —
-        // он всплывал бы окном при каждом запуске, а при ненастроенном GPGS ещё и падал.
+    async function signIn(silent) {
         try {
-            const result = await playGamesPlugin.signIn({ silent: true });
-            if (result && result.isAuthenticated) {
-                isAuthenticated = true;
-                console.log("GPGS: Silently signed in!");
-                // Облачный сейв (надстройка): подтянуть/слить прогресс из облака.
+            const result = await playGamesPlugin.signIn({ silent });
+            isAuthenticated = result?.signedIn === true;
+            // Облачный сейв (надстройка): подтянуть/слить прогресс из облака.
+            if (isAuthenticated) {
                 try { if (window.CloudSave) window.CloudSave.onSignedIn(playGamesPlugin); } catch (e) {}
             }
         } catch (e) {
-            console.log("GPGS: Silent sign-in unavailable (GPGS not configured yet).", e);
+            isAuthenticated = false;
         }
+        return isAuthenticated;
+    }
+
+    async function silentSignIn() {
+        // Не показываем интерактивное окно на старте. Явный вход допустим только
+        // после нажатия игроком на leaderboard.
+        return signIn(true);
     }
 
     async function submitScore(leaderboardId, score) {
@@ -56,7 +59,6 @@ const PlayGames = (function() {
                 leaderboardId: leaderboardId,
                 score: score
             });
-            console.log("GPGS: Score submitted successfully!");
         } catch (e) {
             console.error("GPGS: Failed to submit score", e);
         }
@@ -64,7 +66,7 @@ const PlayGames = (function() {
 
     async function showLeaderboard(leaderboardId) {
         if (!isCapacitor() || !playGamesPlugin) return false;
-        if (!isAuthenticated) await silentSignIn();
+        if (!isAuthenticated) await signIn(false);
         if (isAuthenticated) {
             try {
                 await playGamesPlugin.showLeaderboard({ leaderboardId: leaderboardId });
@@ -80,8 +82,12 @@ const PlayGames = (function() {
         appPlugin.addListener("backButton", (event) => {
             const openModals = document.querySelectorAll(".modal-overlay.active");
             if (openModals.length > 0) {
-                openModals.forEach(m => m.classList.remove("active"));
-                window.dispatchEvent(new CustomEvent("modalClosedViaBackButton"));
+                window.dispatchEvent(new CustomEvent("closeModalsViaBackButton"));
+                return;
+            }
+
+            if (document.querySelector("#settings-menu.active")) {
+                window.dispatchEvent(new CustomEvent("closeSettingsMenuViaBackButton"));
                 return;
             }
 

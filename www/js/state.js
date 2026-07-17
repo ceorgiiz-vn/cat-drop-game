@@ -1,5 +1,158 @@
 // Game state manager for Cat Drop: Evolution
 
+const CatDropData = (function() {
+    const SAVE_KEY = "cat_drop_save_data";
+    const SESSION_KEY = "cat_drop_session_data";
+    const THEMES = new Set(["Indigo Night", "Violet Night", "Forest Night", "Rose Night", "Charcoal Night"]);
+    const SKINS = new Set(["Rapper", "Zombie", "Vampire", "Bard", "Oldman"]);
+    const SOUND_SETS = new Set(["Mystic", "Rapper", "Zombie", "Vampire", "Oldman"]);
+    const SPECIALS = new Set(["sticky", "soapy", "heavy", "explosive", "ghost"]);
+    const MAX_SESSION_CATS = 256;
+
+    function isObject(value) {
+        return value !== null && typeof value === "object" && !Array.isArray(value);
+    }
+
+    function number(value, fallback, min, max, integer = false) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        const bounded = Math.max(min, Math.min(max, parsed));
+        return integer ? Math.trunc(bounded) : bounded;
+    }
+
+    function text(value, fallback = "", maxLength = 128) {
+        if (typeof value !== "string") return fallback;
+        return value.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, maxLength);
+    }
+
+    function stringList(value, allowed, fallback) {
+        if (!Array.isArray(value)) return fallback.slice();
+        return [...new Set(value.filter(item => typeof item === "string" && allowed.has(item)))];
+    }
+
+    function sheetsUrl(value) {
+        if (typeof value !== "string" || !value) return "";
+        try {
+            const parsed = new URL(value);
+            const allowedHost = parsed.hostname === "script.google.com" || parsed.hostname.endsWith(".googleusercontent.com");
+            return parsed.protocol === "https:" && allowedHost ? parsed.href.slice(0, 2048) : "";
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function normalizeSave(value) {
+        const data = isObject(value) ? value : {};
+        const unlockedThemes = stringList(data.unlocked_themes, THEMES, ["Indigo Night"]);
+        if (!unlockedThemes.includes("Indigo Night")) unlockedThemes.unshift("Indigo Night");
+        const purchasedSkins = stringList(data.purchased_skins, SKINS, []);
+        const purchasedSounds = stringList(data.purchased_sounds, SOUND_SETS, []);
+
+        const assignments = {};
+        if (isObject(data.skin_assignments)) {
+            for (const skinId of purchasedSkins) {
+                const level = number(data.skin_assignments[skinId], 0, 0, 11, true);
+                if (level > 0) assignments[skinId] = level;
+            }
+        }
+
+        const requestedTheme = text(data.active_theme, "Indigo Night", 32);
+        const requestedSound = text(data.active_sound_set, "Default", 32);
+        return {
+            schema_version: 2,
+            highscore: number(data.highscore, 0, 0, 1_000_000_000, true),
+            today_best: number(data.today_best, 0, 0, 1_000_000_000, true),
+            today_date: text(data.today_date, "", 10),
+            year_best: number(data.year_best, 0, 0, 1_000_000_000, true),
+            year_date: text(data.year_date, "", 4),
+            player_name: text(data.player_name, "", 15),
+            google_sheets_url: sheetsUrl(data.google_sheets_url),
+            fish_coins: number(data.fish_coins, 0, 0, 1_000_000_000, true),
+            unlocked_themes: unlockedThemes,
+            active_theme: unlockedThemes.includes(requestedTheme) ? requestedTheme : "Indigo Night",
+            purchased_skins: purchasedSkins,
+            skin_assignments: assignments,
+            purchased_sounds: purchasedSounds,
+            active_sound_set: requestedSound === "Default" || purchasedSounds.includes(requestedSound) ? requestedSound : "Default",
+            sfx_enabled: typeof data.sfx_enabled === "boolean" ? data.sfx_enabled : true,
+            music_enabled: typeof data.music_enabled === "boolean" ? data.music_enabled : true
+        };
+    }
+
+    function normalizeSpawn(value) {
+        if (!isObject(value)) return { level: 1, special: null };
+        const level = number(value.level, 1, -1, 11, true);
+        const special = value.special == null ? null : text(value.special, "", 16);
+        return {
+            level,
+            special: special && SPECIALS.has(special) ? special : null
+        };
+    }
+
+    function normalizeSessionCat(value) {
+        if (!isObject(value)) return null;
+        const posX = Number(value.pos_x);
+        const posY = Number(value.pos_y);
+        const level = Number(value.level);
+        if (!Number.isFinite(posX) || !Number.isFinite(posY) || !Number.isInteger(level) || level < -1 || level > 11) {
+            return null;
+        }
+
+        const special = value.special == null ? null : text(value.special, "", 16);
+        return {
+            level,
+            special: special && SPECIALS.has(special) ? special : null,
+            pos_x: number(posX, 360, -720, 1440),
+            pos_y: number(posY, 600, -1280, 2560),
+            rot: number(value.rot, 0, -1000, 1000),
+            vel_x: number(value.vel_x, 0, -100, 100),
+            vel_y: number(value.vel_y, 0, -100, 100),
+            ang_vel: number(value.ang_vel, 0, -20, 20)
+        };
+    }
+
+    function normalizeSession(value) {
+        if (!isObject(value) || !Array.isArray(value.cats) || value.cats.length > MAX_SESSION_CATS) return null;
+        const cats = value.cats.map(normalizeSessionCat);
+        if (cats.some(cat => cat === null)) return null;
+
+        const legacySpawn = value.next_cat_level !== undefined
+            ? { level: value.next_cat_level, special: null }
+            : { level: 1, special: null };
+        return {
+            schema_version: 2,
+            score: number(value.score, 0, 0, 1_000_000_000, true),
+            fish_coins: number(value.fish_coins, 0, 0, 1_000_000_000, true),
+            next_spawn: normalizeSpawn(value.next_spawn || legacySpawn),
+            game_mode: "classic",
+            cup_tilt: 0,
+            total_drops: number(value.total_drops, cats.length, cats.length, 1_000_000, true),
+            cats
+        };
+    }
+
+    function readLeaderboard(storageKey) {
+        try {
+            const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
+            if (!Array.isArray(parsed)) return [];
+            return parsed
+                .filter(entry => isObject(entry) && typeof entry.name === "string" && Number.isFinite(Number(entry.score)))
+                .map(entry => ({
+                    name: text(entry.name, "", 15),
+                    score: number(entry.score, 0, 0, 1_000_000_000, true)
+                }))
+                .filter(entry => entry.name && entry.score > 0)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 10);
+        } catch (_) {
+            localStorage.removeItem(storageKey);
+            return [];
+        }
+    }
+
+    return { SAVE_KEY, SESSION_KEY, normalizeSave, normalizeSession, readLeaderboard };
+})();
+
 const GameState = {
     // Current variables
     score: 0,
@@ -55,48 +208,40 @@ const GameState = {
     load() {
         // Request persistent storage so progress is not wiped to clear space
         if (navigator.storage && navigator.storage.persist) {
-            navigator.storage.persist().then(granted => {
-                if (granted) console.log("Persistent storage granted. Saves are safe!");
-                else console.log("Persistent storage not granted.");
-            });
+            navigator.storage.persist().catch(() => {});
         }
 
-        const dataStr = localStorage.getItem("cat_drop_save_data");
+        const dataStr = localStorage.getItem(CatDropData.SAVE_KEY);
         if (dataStr) {
             try {
-                const data = JSON.parse(dataStr);
-                this.highscore = data.highscore ?? 0;
-                this.today_best = data.today_best ?? 0;
-                this.today_date = data.today_date ?? "";
-                this.year_best = data.year_best ?? 0;
-                this.year_date = data.year_date ?? "";
-                this.player_name = data.player_name ?? "";
-                this.google_sheets_url = data.google_sheets_url ?? "";
-                this.fish_coins = data.fish_coins ?? 0;
-                this.unlocked_themes = data.unlocked_themes ?? ["Indigo Night"];
-                this.active_theme = data.active_theme ?? "Indigo Night";
-                this.purchased_skins = data.purchased_skins ?? [];
-                
-                // Convert skin assignments
-                this.skin_assignments = {};
-                if (data.skin_assignments) {
-                    for (const k in data.skin_assignments) {
-                        this.skin_assignments[k] = parseInt(data.skin_assignments[k]) || 0;
-                    }
-                }
-                
-                this.purchased_sounds = data.purchased_sounds ?? [];
-                this.active_sound_set = data.active_sound_set ?? "Default";
-                this.sfx_enabled = data.sfx_enabled ?? true;
-                this.music_enabled = data.music_enabled ?? true;
+                const data = CatDropData.normalizeSave(JSON.parse(dataStr));
+                this.highscore = data.highscore;
+                this.today_best = data.today_best;
+                this.today_date = data.today_date;
+                this.year_best = data.year_best;
+                this.year_date = data.year_date;
+                this.player_name = data.player_name;
+                this.google_sheets_url = data.google_sheets_url;
+                this.fish_coins = data.fish_coins;
+                this.unlocked_themes = data.unlocked_themes;
+                this.active_theme = data.active_theme;
+                this.purchased_skins = data.purchased_skins;
+                this.skin_assignments = data.skin_assignments;
+                this.purchased_sounds = data.purchased_sounds;
+                this.active_sound_set = data.active_sound_set;
+                this.sfx_enabled = data.sfx_enabled;
+                this.music_enabled = data.music_enabled;
+                localStorage.setItem(CatDropData.SAVE_KEY, JSON.stringify(data));
             } catch (e) {
-                console.error("Error parsing save data, using defaults", e);
+                console.warn("Invalid save data removed; using defaults", e);
+                localStorage.removeItem(CatDropData.SAVE_KEY);
             }
         }
     },
 
     save() {
         const data = {
+            schema_version: 2,
             highscore: this.highscore,
             today_best: this.today_best,
             today_date: this.today_date,
@@ -114,7 +259,7 @@ const GameState = {
             sfx_enabled: this.sfx_enabled,
             music_enabled: this.music_enabled
         };
-        localStorage.setItem("cat_drop_save_data", JSON.stringify(data));
+        localStorage.setItem(CatDropData.SAVE_KEY, JSON.stringify(CatDropData.normalizeSave(data)));
         this.triggerStateChange();
         // Облачный сейв (надстройка): пуш в Play Games, если залогинен. Без влияния на локалку.
         try { if (window.CloudSave) window.CloudSave.onLocalSave(); } catch (e) {}
@@ -272,6 +417,7 @@ const GameState = {
         }));
 
         const data = {
+            schema_version: 2,
             score: current_score,
             fish_coins: current_coins,
             next_spawn: next_spawn,
@@ -281,25 +427,28 @@ const GameState = {
             cats: catsData
         };
 
-        localStorage.setItem("cat_drop_session_data", JSON.stringify(data));
+        localStorage.setItem(CatDropData.SESSION_KEY, JSON.stringify(data));
     },
 
     hasSavedSession() {
-        return localStorage.getItem("cat_drop_session_data") !== null;
+        return this.loadActiveSession() !== null;
     },
 
     deleteActiveSession() {
-        localStorage.removeItem("cat_drop_session_data");
+        localStorage.removeItem(CatDropData.SESSION_KEY);
     },
 
     loadActiveSession() {
-        const sessionStr = localStorage.getItem("cat_drop_session_data");
+        const sessionStr = localStorage.getItem(CatDropData.SESSION_KEY);
         if (sessionStr) {
             try {
-                return JSON.parse(sessionStr);
+                const session = CatDropData.normalizeSession(JSON.parse(sessionStr));
+                if (session) return session;
+                console.warn("Invalid session data removed");
             } catch (e) {
-                console.error("Error parsing session data", e);
+                console.warn("Invalid session JSON removed", e);
             }
+            this.deleteActiveSession();
         }
         return null;
     },
@@ -310,7 +459,7 @@ const GameState = {
 
     submitToLeaderboard(storageKey, name, score) {
         if (!name || score <= 0) return;
-        let board = JSON.parse(localStorage.getItem(storageKey)) || [];
+        let board = CatDropData.readLeaderboard(storageKey);
         const idx = board.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
         if (idx !== -1) {
             if (score > board[idx].score) board[idx].score = score;
@@ -322,7 +471,7 @@ const GameState = {
     },
 
     getLeaderboard(storageKey) {
-        return JSON.parse(localStorage.getItem(storageKey)) || [];
+        return CatDropData.readLeaderboard(storageKey);
     }
 };
 

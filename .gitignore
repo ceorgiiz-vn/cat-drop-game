@@ -4,6 +4,10 @@ android/build/
 android/.gradle/
 android/.idea/
 android/local.properties
+android/keystore.properties
+android/app/*.keystore
+*.jks
+*.p12
 *.apk
 *.aab
 .DS_Store

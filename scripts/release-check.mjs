@@ -72,7 +72,8 @@ for (const match of sw.matchAll(/['"]\.\/([^'"]+)['"]/g)) {
   if (!existsSync(path.join(www, ref))) fail(`sw.js cache list references missing file: ${ref}`);
 }
 for (const match of sw.matchAll(/'([^']+\.wav)'/g)) {
-  const ref = path.join("assets", "audio", match[1]);
+  const rawRef = match[1].replace(/^\.\//, "");
+  const ref = rawRef.includes("/") ? rawRef : path.join("assets", "audio", rawRef);
   if (!existsSync(path.join(www, ref))) fail(`sw.js AUDIO_FILES references missing file: ${ref}`);
 }
 ok("service worker cache list is valid");

@@ -3,6 +3,43 @@
 
 const CatSprite = (function() {
     const EDGE_OVERSCALE = 1.16; // fill the ball circle on high-DPI phones
+    const spriteCache = new WeakMap();
+
+    function getCachedCircleSprite(img, radius) {
+        let bySize = spriteCache.get(img);
+        if (!bySize) {
+            bySize = new Map();
+            spriteCache.set(img, bySize);
+        }
+
+        // Супер-сэмплинг: растеризуем спрайт под плотность пикселей экрana (как канвас игры),
+        // иначе мелкие коты (1–3 ур.) выглядели мыльными после апскейла канваса.
+        const SS = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+        const displayD = radius * 2;
+        const px = Math.max(1, Math.ceil(displayD * SS));
+        const key = `${px}`;
+        const cached = bySize.get(key);
+        if (cached) return cached;
+
+        const offscreen = document.createElement("canvas");
+        offscreen.width = px;
+        offscreen.height = px;
+        offscreen.displayD = displayD; // логический размер для отрисовки
+
+        const offscreenCtx = offscreen.getContext("2d");
+        offscreenCtx.save();
+        offscreenCtx.beginPath();
+        offscreenCtx.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2);
+        offscreenCtx.clip();
+        offscreenCtx.imageSmoothingEnabled = true;
+        offscreenCtx.imageSmoothingQuality = "high";
+        const drawD = px * EDGE_OVERSCALE;
+        offscreenCtx.drawImage(img, (px - drawD) / 2, (px - drawD) / 2, drawD, drawD);
+        offscreenCtx.restore();
+
+        bySize.set(key, offscreen);
+        return offscreen;
+    }
 
     function previewDisplayD(canvas, fallbackDiameter) {
         // Deliberately NOT measured via canvas.getBoundingClientRect(): every preview's
@@ -30,15 +67,9 @@ const CatSprite = (function() {
 
     function draw(ctx, img, radius) {
         if (!img || !img.complete || !img.naturalWidth) return;
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(0, 0, radius, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        const r = radius * EDGE_OVERSCALE;
-        ctx.drawImage(img, -r, -r, r * 2, r * 2);
-        ctx.restore();
+        const sprite = getCachedCircleSprite(img, radius);
+        const displayD = sprite.displayD || sprite.width;
+        ctx.drawImage(sprite, -displayD / 2, -displayD / 2, displayD, displayD);
     }
 
     function drawGolden(ctx, radius, time) {

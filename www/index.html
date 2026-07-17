@@ -13,22 +13,21 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png">
 
     <title>Cat Drop 2</title>
-    <link rel="stylesheet" href="style.css?v=44">
+    <link rel="stylesheet" href="style.css?v=48">
 
     <!-- Диагностика: локальный Sentry SDK + «чёрный ящик». Только наблюдает, игру не меняет. -->
     <script src="js/sentry.min.js?v=1"></script>
     <script src="js/diagnostics.js?v=1"></script>
     <script src="js/diagnostics_watchdogs.js?v=1"></script>
-
     <script src="js/telegram.js?v=1"></script>
 
     <!-- Matter.js Physics Engine -->
     <script src="js/matter.min.js"></script>
 
     <!-- State and Session Manager -->
-    <script src="js/state.js?v=6"></script>
+    <script src="js/state.js?v=7"></script>
     <script src="js/game_modes.js?v=7"></script>
-    <script src="js/sprite.js?v=17"></script>
+    <script src="js/sprite.js?v=20"></script>
     <script src="js/responsive.js?v=2"></script>
 </head>
 <body>
@@ -71,22 +70,58 @@
             <div class="hud-right-col">
                 <!-- Top controls row -->
                 <div class="hud-controls-row">
-                    <button class="hud-audio-btn" id="hud-sfx-btn" title="Toggle SFX">🔊</button>
-                    <button class="hud-audio-btn" id="hud-music-btn" title="Toggle Music">🎵</button>
+                    <button class="hud-audio-btn" id="hud-sfx-btn" title="Toggle SFX" type="button" aria-label="Turn sound effects off" aria-pressed="true">🔊</button>
+                    <button class="hud-audio-btn" id="hud-music-btn" title="Toggle Music" type="button" aria-label="Turn music off" aria-pressed="true">🎵</button>
                     
                     <div class="hud-menu-wrap">
-                        <button class="hamburger-btn" id="main-menu-btn" title="Menu">☰</button>
-                        <div class="expandable-menu" id="settings-menu">
-                            <button class="menu-item-btn" id="name-display-btn">
-                                <span class="hud-player-avatar" id="player-avatar">G</span> <span class="menu-item-text">Profile</span>
-                            </button>
-                            <button class="menu-item-btn" id="shop-btn">🛒 <span class="menu-item-text">Shop</span></button>
-                            <button class="menu-item-btn" id="leaderboard-btn">🏆 <span class="menu-item-text">Leaders</span></button>
-                            <button class="menu-item-btn" id="evolution-btn">🧬 <span class="menu-item-text">Evolution</span></button>
-                            <button class="menu-item-btn" id="sfx-btn">🔊 <span class="menu-item-text">SFX</span></button>
-                            <button class="menu-item-btn" id="music-btn">🎵 <span class="menu-item-text">Music</span></button>
-                            <button class="menu-item-btn" id="help-btn">❔ <span class="menu-item-text">Help</span></button>
-                            <button class="menu-item-btn quick-restart-btn" id="quick-restart-btn">🔄 <span class="menu-item-text">Restart</span></button>
+                        <button class="hamburger-btn" id="main-menu-btn" title="Menu" type="button" aria-label="Open menu" aria-haspopup="dialog" aria-expanded="false">☰</button>
+                        <div class="menu-backdrop" id="settings-menu-backdrop" aria-hidden="true"></div>
+                        <div class="expandable-menu" id="settings-menu" role="dialog" aria-modal="true" aria-labelledby="settings-menu-title" aria-hidden="true" inert>
+                            <div class="menu-sheet-head">
+                                <div class="menu-title-block">
+                                    <span class="menu-sheet-label">Cat Drop</span>
+                                    <span class="menu-sheet-title" id="settings-menu-title">Menu</span>
+                                </div>
+                                <button class="menu-close-btn" id="menu-close-btn" type="button" aria-label="Close menu">×</button>
+                            </div>
+                            <div class="menu-grid">
+                                <button class="menu-item-btn" id="name-display-btn" type="button">
+                                    <span class="menu-item-icon hud-player-avatar" id="player-avatar">G</span>
+                                    <span class="menu-item-text">Profile</span>
+                                </button>
+                                <button class="menu-item-btn" id="shop-btn" type="button">
+                                    <span class="menu-item-icon">🛒</span>
+                                    <span class="menu-item-text">Shop</span>
+                                </button>
+                                <button class="menu-item-btn" id="leaderboard-btn" type="button">
+                                    <span class="menu-item-icon">🏆</span>
+                                    <span class="menu-item-text">Leaders</span>
+                                </button>
+                                <button class="menu-item-btn" id="evolution-btn" type="button">
+                                    <span class="menu-item-icon">🧬</span>
+                                    <span class="menu-item-text">Evolution</span>
+                                </button>
+                                <button class="menu-item-btn" id="help-btn" type="button">
+                                    <span class="menu-item-icon">?</span>
+                                    <span class="menu-item-text">Help</span>
+                                </button>
+                                <button class="menu-item-btn quick-restart-btn" id="quick-restart-btn" type="button">
+                                    <span class="menu-item-icon">↻</span>
+                                    <span class="menu-item-text">Restart</span>
+                                </button>
+                                <button class="menu-item-btn menu-soon-btn" type="button" disabled>
+                                    <span class="menu-item-icon">＋</span>
+                                    <span class="menu-item-text">Soon</span>
+                                </button>
+                                <button class="menu-item-btn menu-soon-btn" type="button" disabled>
+                                    <span class="menu-item-icon">＋</span>
+                                    <span class="menu-item-text">Soon</span>
+                                </button>
+                                <button class="menu-item-btn menu-soon-btn" type="button" disabled>
+                                    <span class="menu-item-icon">＋</span>
+                                    <span class="menu-item-text">Soon</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -94,7 +129,7 @@
                 <!-- Records Plate — реальные локальные рекорды (без пустых ---) -->
                 <div class="hud-records-plate">
                     <div class="stat-cell">
-                        <div class="stat-label">BEST</div>
+                        <div class="stat-label" id="highscore-title-text">BEST</div>
                         <div class="stat-value" id="highscore-val">0</div>
                     </div>
                     <div class="stat-cell">
@@ -113,11 +148,11 @@
 
         <!-- Boosters container at left -->
         <div class="hud-element boosters-container">
-            <button class="paper-button booster-btn" id="yarn-btn" title="SHAKE: jostle the cup (1000 🐟)">
+            <button class="paper-button booster-btn" id="yarn-btn" type="button" aria-label="Shake the cup, costs 1000 fish" title="SHAKE: jostle the cup (1000 🐟)">
                 <span class="booster-label">SHAKE</span>
                 <span class="booster-cost">1000 🐟</span>
             </button>
-            <button class="paper-button booster-btn" id="fishbone-btn" title="POP: erase one cat (2500 🐟)">
+            <button class="paper-button booster-btn" id="fishbone-btn" type="button" aria-label="Erase one cat, costs 2500 fish" title="POP: erase one cat (2500 🐟)">
                 <svg class="booster-needle" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 20 L20 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
                     <path d="M16 4 L20 4 L20 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -141,12 +176,12 @@
         <!-- ================= MODALS OVERLAYS ================= -->
 
         <!-- 1. Player Profile & Nickname Modal -->
-        <div class="modal-overlay" id="nickname-overlay">
+        <div class="modal-overlay" id="nickname-overlay" role="dialog" aria-modal="true" aria-hidden="true" inert>
             <div class="modal-panel">
                 <h2 class="modal-title" id="profile-title">Player Profile</h2>
                 <div class="modal-subtitle" id="profile-subtitle">Set nickname for leaderboards</div>
                 
-                <input type="text" class="text-input" id="nickname-input" placeholder="Enter Nickname" maxlength="15">
+                <input type="text" class="text-input" id="nickname-input" aria-label="Nickname" placeholder="Enter Nickname" maxlength="15">
                 
                 <div class="profile-stats" id="profile-stats">
                     <div class="stat-row">
@@ -171,7 +206,7 @@
         </div>
 
         <!-- 2. Global Leaderboard Modal -->
-        <div class="modal-overlay" id="leaderboard-overlay">
+        <div class="modal-overlay" id="leaderboard-overlay" role="dialog" aria-modal="true" aria-hidden="true" inert>
             <div class="modal-panel">
                 <h2 class="modal-title">Leaderboard</h2>
                 <div class="modal-subtitle" id="leaderboard-subtitle">Top Cat Evolutionists (All-Time)</div>
@@ -194,7 +229,7 @@
         </div>
 
         <!-- 3. Cat Evolution Chart Modal -->
-        <div class="modal-overlay" id="evolution-overlay">
+        <div class="modal-overlay" id="evolution-overlay" role="dialog" aria-modal="true" aria-hidden="true" inert>
             <div class="modal-panel evolution-panel">
                 <h2 class="modal-title">Cat Evolution</h2>
                 <div class="modal-subtitle">Merge matching cats to advance — Lvl 1 to Lvl 11</div>
@@ -210,7 +245,7 @@
         </div>
 
         <!-- 4. Theme, Skin, and Sound Shop Modal -->
-        <div class="modal-overlay" id="shop-overlay">
+        <div class="modal-overlay" id="shop-overlay" role="dialog" aria-modal="true" aria-hidden="true" inert>
             <div class="modal-panel">
                 <h2 class="modal-title">Fish Coin Shop</h2>
                 <div class="modal-subtitle" id="shop-balance">Your Balance: 🐟 0</div>
@@ -233,7 +268,7 @@
         </div>
 
         <!-- 5. How to Play (Help) Modal -->
-        <div class="modal-overlay" id="help-overlay">
+        <div class="modal-overlay" id="help-overlay" role="dialog" aria-modal="true" aria-hidden="true" inert>
             <div class="modal-panel">
                 <h2 class="modal-title">How To Play</h2>
                 <div class="modal-subtitle">Rules of Cat Drop</div>
@@ -256,7 +291,7 @@
         </div>
 
         <!-- 6. Game Over Modal -->
-        <div class="modal-overlay" id="gameover-overlay">
+        <div class="modal-overlay" id="gameover-overlay" role="dialog" aria-modal="true" aria-hidden="true" inert>
             <div class="modal-panel">
                 <h2 class="modal-title" style="color: #ff9ebb;">Game Over</h2>
                 <div class="modal-subtitle" id="gameover-score-text">Your Score: 0</div>
@@ -275,7 +310,7 @@
         </div>
 
         <!-- 6b. Quick Restart Confirmation Modal -->
-        <div class="modal-overlay" id="restart-confirm-overlay">
+        <div class="modal-overlay" id="restart-confirm-overlay" role="dialog" aria-modal="true" aria-hidden="true" inert>
             <div class="modal-panel">
                 <h2 class="modal-title">Restart Game?</h2>
                 <div class="modal-subtitle">Your current progress will be lost. Are you sure you want to start a new game?</div>
@@ -288,7 +323,7 @@
         </div>
 
         <!-- 7. Save Session Resume Modal -->
-        <div class="modal-overlay" id="resume-overlay">
+        <div class="modal-overlay" id="resume-overlay" role="dialog" aria-modal="true" aria-hidden="true" inert>
             <div class="modal-panel">
                 <h2 class="modal-title">Resume Session</h2>
                 <div class="modal-subtitle">A suspended game session was found. Do you want to load it and continue playing?</div>
@@ -303,7 +338,7 @@
     </div><!-- /.game-wrapper -->
 
     <!-- Web Audio engine -->
-    <script src="js/audio.js?v=9"></script>
+    <script src="js/audio.js?v=14"></script>
 
     <!-- Frozen Matter.js physics baseline (do not tune in game.js) -->
     <script src="js/physics.js?v=8"></script>
@@ -312,17 +347,16 @@
     <script src="js/cloud_save.js?v=1"></script>
 
     <!-- GPGS & App Native Events -->
-    <script src="js/play_games.js?v=3"></script>
+    <script src="js/play_games.js?v=4"></script>
 
     <!-- Core Game Controller Logic -->
-    <script src="js/game.js?v=82"></script>
+    <script src="js/game.js?v=98"></script>
     
     <!-- Register Service Worker -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker registered!', reg))
                     .catch(err => console.error('Service Worker registration failed:', err));
             });
         }

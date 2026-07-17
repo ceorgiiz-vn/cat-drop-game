@@ -3,13 +3,23 @@
 (function() {
     // Canvas & Graphics Context
     const canvas = document.getElementById("game-canvas");
-    const ctx = canvas.getContext("2d");
+    let ctx = canvas.getContext("2d", { alpha: false });
+    const scheduleGameTask = globalThis.setTimeout.bind(globalThis);
 
     // Fix Canvas coordinate buffer space to match Godot virtual resolution
     const GAME_W = 720;
     const GAME_H = 1280;
-    canvas.width = GAME_W;
-    canvas.height = GAME_H;
+    // РЕЗКОСТЬ: буфер канваса рендерим крупнее логического 720x1280 — под плотность пикселей
+    // экрана, а весь рисунок масштабируем на RENDER_SCALE. Логические координаты игры (720x1280)
+    // и вся логика НЕ меняются. Чтобы вернуть прежнее поведение — поставить RENDER_SCALE = 1.
+    const RENDER_SCALE = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    canvas.width = Math.round(GAME_W * RENDER_SCALE);
+    canvas.height = Math.round(GAME_H * RENDER_SCALE);
+    const staticBackgroundCanvas = document.createElement("canvas");
+    staticBackgroundCanvas.width = Math.round(GAME_W * RENDER_SCALE);
+    staticBackgroundCanvas.height = Math.round(GAME_H * RENDER_SCALE);
+    const staticBackgroundCtx = staticBackgroundCanvas.getContext("2d", { alpha: false });
+    let staticBackgroundCacheKey = "";
 
     // Matter.js modules shorthand
     const { Engine, World, Bodies, Body, Composite, Events } = Matter;
@@ -35,6 +45,7 @@
     let gameSessionId = 0;
     let lastTime = performance.now();
     let physicsAccumulator = 0;
+    let lastPausedRender = 0;
     let currentMaxDeathTime = 0;
     let lastUndoSnapshot = null;
     let pendingGameOver = false;
@@ -67,15 +78,39 @@
     const catImages = {};
     const skinImages = {};
 
+    function ensureImage(cache, key, url) {
+        if (cache[key]) return cache[key];
+        const img = new Image();
+        img.src = url;
+        cache[key] = img;
+        return img;
+    }
+
+    function ensureCatImage(level) {
+        return ensureImage(catImages, level, `assets/sprites/cat_${level}.png`);
+    }
+
+    function ensureSkinImage(skinId) {
+        return ensureImage(skinImages, skinId, `assets/sprites/skin_${skinId.toLowerCase()}.png`);
+    }
+
+    function ensureDevPeekImage() {
+        if (!devCatPeekImage) {
+            devCatPeekImage = new Image();
+            devCatPeekImage.src = "assets/dev-cat-peek-peace.png?v=5";
+        }
+        return devCatPeekImage;
+    }
+
     function getCatImage(level) {
         for (const skinId in GameState.skin_assignments) {
             if (GameState.skin_assignments[skinId] === level) {
-                const skin = skinImages[skinId];
+                const skin = ensureSkinImage(skinId);
                 if (skin && skin.complete && skin.naturalWidth) return skin;
                 break;
             }
         }
-        return catImages[level];
+        return ensureCatImage(level);
     }
 
     function drawCatSprite(ctx, img, radius) {
@@ -104,6 +139,11 @@
         GameAudio.playMerge(pitch);
     }
 
+    function playUiClickSound() {
+        unlockAudio();
+        playMergeSound(1.0);
+    }
+
     function playGameOverSound() {
         if (!GameState.sfx_enabled) return;
         GameAudio.playGameOver();
@@ -116,7 +156,7 @@
     function updateBGMState() {
         GameAudio.setMusicEnabled(GameState.music_enabled);
         GameAudio.setSfxEnabled(GameState.sfx_enabled);
-        GameAudio.updateBGM(GameState.music_enabled && hasInteracted && !isGameOver);
+        GameAudio.updateBGM(GameState.music_enabled && hasInteracted && !isGameOver && !document.hidden);
     }
 
     function unlockAudio() {
@@ -131,6 +171,10 @@
     const LEFT_LIMIT = 80;
     const RIGHT_LIMIT = 640;
     const CUP_RIM_Y = 250 + GAME_Y_OFFSET;
+    const DEATH_LINE_WARNING_MARGIN = 12;
+    const DEATH_LINE_SPEED_THRESHOLD = 0.8;
+    const GAME_OVER_HOLD_SECONDS = 3.0;
+    const PREWARNING_MAX_SIGNAL_TIME = 0.75;
     const CUP_PHYSICS_TOP_Y = 80 + GAME_Y_OFFSET; // invisible wall extension above visual rim (avoids top-corner bounce)
     const FLOOR_TOP_Y = 1100 + GAME_Y_OFFSET;
     const mergingBodyIds = new Set();
@@ -165,34 +209,27 @@
     let totalDropsThisSession = 0;
     let cupLeftWall = null;
     let cupRightWall = null;
-    let cupLeftCorner = null;
-    let cupRightCorner = null;
     let cupFloor = null;
 
     const CUP_WALL_LEFT_X = 90;
     const CUP_WALL_RIGHT_X = 630;
+    const CUP_WALL_THICKNESS = 20;
+    const CUP_INNER_LEFT_X = CUP_WALL_LEFT_X + CUP_WALL_THICKNESS / 2;
+    const CUP_INNER_RIGHT_X = CUP_WALL_RIGHT_X - CUP_WALL_THICKNESS / 2;
     const CUP_WALL_BOTTOM_Y = 1075 + GAME_Y_OFFSET;
-    const CUP_CORNER_LEFT_A = { x: 80, y: 1075 + GAME_Y_OFFSET };
-    const CUP_CORNER_LEFT_B = { x: 110, y: 1098 + GAME_Y_OFFSET };
-    const CUP_CORNER_RIGHT_A = { x: 610, y: 1098 + GAME_Y_OFFSET };
-    const CUP_CORNER_RIGHT_B = { x: 640, y: 1075 + GAME_Y_OFFSET };
     const CUP_FLOOR_X = 360;
     const CUP_FLOOR_Y = 1110 + GAME_Y_OFFSET;
+    const CUP_FLOOR_WIDTH = 560;
+    const CUP_FLOOR_HEIGHT = 20;
+    const CUP_WALL_PHYSICS_BOTTOM_Y = CUP_FLOOR_Y + 40;
+    const CUP_WALL_SPAWN_PADDING = 0;
+    const CUP_CORNER_LANDING_MAX_SPEED = 20;
+    const CUP_CORNER_LANDING_HEIGHT = 140;
+    const CUP_CORNER_LANDING_SIDE_PAD = 100;
+    const CUP_CORNER_REBOUND_MAX_SPEED = 2;
+    const CUP_CORNER_REBOUND_HEIGHT = 70;
     const CUP_PIVOT_X = 360;
     const CUP_PIVOT_Y = 1060 + GAME_Y_OFFSET; // pivot near cup base
-    const WALL_CORNER_OVERLAP = 10;
-    const CORNER_THICKNESS = 22;
-    const LEFT_CORNER_ANGLE = Math.atan2(CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y, CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x);
-    const RIGHT_CORNER_ANGLE = Math.atan2(CUP_CORNER_RIGHT_B.y - CUP_CORNER_RIGHT_A.y, CUP_CORNER_RIGHT_B.x - CUP_CORNER_RIGHT_A.x);
-    const LEFT_CORNER_CENTER = {
-        x: (CUP_CORNER_LEFT_A.x + CUP_CORNER_LEFT_B.x) / 2,
-        y: (CUP_CORNER_LEFT_A.y + CUP_CORNER_LEFT_B.y) / 2
-    };
-    const RIGHT_CORNER_CENTER = {
-        x: (CUP_CORNER_RIGHT_A.x + CUP_CORNER_RIGHT_B.x) / 2,
-        y: (CUP_CORNER_RIGHT_A.y + CUP_CORNER_RIGHT_B.y) / 2
-    };
-    const CORNER_LENGTH = Math.hypot(CUP_CORNER_LEFT_B.x - CUP_CORNER_LEFT_A.x, CUP_CORNER_LEFT_B.y - CUP_CORNER_LEFT_A.y) + 18;
 
     function rotatePoint(px, py, angle) {
         const dx = px - CUP_PIVOT_X;
@@ -217,24 +254,18 @@
     }
 
     function updateCupBoundaries(angle) {
-        if (!cupLeftWall || !cupRightWall || !cupLeftCorner || !cupRightCorner || !cupFloor) return;
-        const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_CORNER_OVERLAP;
+        if (!cupLeftWall || !cupRightWall || !cupFloor) return;
+        const wallHeight = CUP_WALL_PHYSICS_BOTTOM_Y - CUP_PHYSICS_TOP_Y;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
 
         const leftPos = rotatePoint(CUP_WALL_LEFT_X, wallCenterY, angle);
         const rightPos = rotatePoint(CUP_WALL_RIGHT_X, wallCenterY, angle);
-        const leftCornerPos = rotatePoint(LEFT_CORNER_CENTER.x, LEFT_CORNER_CENTER.y, angle);
-        const rightCornerPos = rotatePoint(RIGHT_CORNER_CENTER.x, RIGHT_CORNER_CENTER.y, angle);
         const floorPos = rotatePoint(CUP_FLOOR_X, CUP_FLOOR_Y, angle);
 
         Body.setPosition(cupLeftWall, leftPos);
         Body.setAngle(cupLeftWall, angle);
         Body.setPosition(cupRightWall, rightPos);
         Body.setAngle(cupRightWall, angle);
-        Body.setPosition(cupLeftCorner, leftCornerPos);
-        Body.setAngle(cupLeftCorner, LEFT_CORNER_ANGLE + angle);
-        Body.setPosition(cupRightCorner, rightCornerPos);
-        Body.setAngle(cupRightCorner, RIGHT_CORNER_ANGLE + angle);
         Body.setPosition(cupFloor, floorPos);
         Body.setAngle(cupFloor, angle);
     }
@@ -244,81 +275,57 @@
 
     // --- Asset Preloading ---
     function preloadAssets(callback) {
-        let loadedCount = 0;
-        const skins = ["Rapper", "Zombie", "Vampire", "Bard", "Oldman"];
-        const totalAssets = 12 + skins.length;
+        const initialImages = [1, 2, 3, 4].map(ensureCatImage);
+        Object.keys(GameState.skin_assignments).forEach(skinId => initialImages.push(ensureSkinImage(skinId)));
 
-        function checkLoaded() {
-            loadedCount++;
-            if (loadedCount === totalAssets && callback) {
-                callback();
-            }
-        }
-
-        for (let i = 1; i <= 11; i++) {
-            const img = new Image();
-            img.onload = checkLoaded;
-            img.onerror = checkLoaded;
-            img.src = `assets/sprites/cat_${i}.png`;
-            catImages[i] = img;
-        }
-
-        skins.forEach(skin => {
-            const img = new Image();
-            img.onload = checkLoaded;
-            img.onerror = checkLoaded;
-            img.src = `assets/sprites/skin_${skin.toLowerCase()}.png`;
-            skinImages[skin] = img;
+        const waits = initialImages.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+                img.addEventListener("load", resolve, { once: true });
+                img.addEventListener("error", resolve, { once: true });
+            });
         });
-
-        const devImg = new Image();
-        devImg.onload = checkLoaded;
-        devImg.onerror = checkLoaded;
-        devImg.src = "assets/dev-cat-peek-peace.png?v=5";
-        devCatPeekImage = devImg;
+        Promise.all(waits).finally(() => {
+            if (callback) callback();
+        });
     }
 
     // --- Physics Engine Initialization ---
     function initPhysics() {
         engine = Engine.create({
+            // enableSleeping ВЫКЛ: со сном Matter «усыплял» медленные тела прямо в воздухе,
+            // из-за чего один-два кота зависали посреди стакана. Без сна коты всегда падают.
+            enableSleeping: false,
             gravity: { y: CatPhysics.GRAVITY_Y },
             positionIterations: CatPhysics.POSITION_ITERATIONS,
             velocityIterations: CatPhysics.VELOCITY_ITERATIONS
         });
 
-        // Rigid side walls stop above the floor. The bottom is flat, so a cat
-        // dropped into the corner can settle instead of riding a diagonal ramp.
-        const wallHeight = CUP_WALL_BOTTOM_Y - CUP_PHYSICS_TOP_Y + WALL_CORNER_OVERLAP;
+        // The visible cup keeps its sketched lower corners, but the collider is
+        // a flat floor plus deep overlapping side walls: no diagonal ramps or
+        // corner seams for round cats to catch.
+        const wallHeight = CUP_WALL_PHYSICS_BOTTOM_Y - CUP_PHYSICS_TOP_Y;
         const wallCenterY = CUP_PHYSICS_TOP_Y + wallHeight / 2;
-        cupLeftWall = Bodies.rectangle(CUP_WALL_LEFT_X, wallCenterY, 20, wallHeight, { 
+        cupLeftWall = Bodies.rectangle(CUP_WALL_LEFT_X, wallCenterY, CUP_WALL_THICKNESS, wallHeight, {
+            label: "cup-left-wall",
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
         });
-        cupRightWall = Bodies.rectangle(CUP_WALL_RIGHT_X, wallCenterY, 20, wallHeight, { 
+        cupRightWall = Bodies.rectangle(CUP_WALL_RIGHT_X, wallCenterY, CUP_WALL_THICKNESS, wallHeight, {
+            label: "cup-right-wall",
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
         });
-        cupLeftCorner = Bodies.rectangle(LEFT_CORNER_CENTER.x, LEFT_CORNER_CENTER.y, CORNER_LENGTH, CORNER_THICKNESS, {
-            isStatic: true,
-            angle: LEFT_CORNER_ANGLE,
-            friction: CatPhysics.WALL_FRICTION,
-            restitution: CatPhysics.WALL_RESTITUTION
-        });
-        cupRightCorner = Bodies.rectangle(RIGHT_CORNER_CENTER.x, RIGHT_CORNER_CENTER.y, CORNER_LENGTH, CORNER_THICKNESS, {
-            isStatic: true,
-            angle: RIGHT_CORNER_ANGLE,
-            friction: CatPhysics.WALL_FRICTION,
-            restitution: CatPhysics.WALL_RESTITUTION
-        });
-        cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, 560, 20, { 
+        cupFloor = Bodies.rectangle(CUP_FLOOR_X, CUP_FLOOR_Y, CUP_FLOOR_WIDTH, CUP_FLOOR_HEIGHT, {
+            label: "cup-floor",
             isStatic: true, 
             friction: CatPhysics.WALL_FRICTION, 
             restitution: CatPhysics.WALL_RESTITUTION 
         });
 
-        World.add(engine.world, [cupLeftWall, cupRightWall, cupLeftCorner, cupRightCorner, cupFloor]);
+        World.add(engine.world, [cupLeftWall, cupRightWall, cupFloor]);
         updateCupBoundaries(cupTiltAngle);
         applyCupGravity();
 
@@ -392,7 +399,7 @@
                         }
 
                         // Delete physics bodies on next tick
-                        setTimeout(() => {
+                        scheduleGameTask(() => {
                             mergingBodyIds.delete(bodyA.id);
                             mergingBodyIds.delete(bodyB.id);
                             Composite.remove(engine.world, [bodyA, bodyB]);
@@ -479,6 +486,7 @@
             isDropped: isDropped,
             isMerged: false,
             deathZoneTime: 0,
+            deathWarningTime: 0,
             spawnScale: isDropped ? 0.2 : 0.0,
             scaleVelocity: 0.0,
             wobbleScaleX: 1.0,
@@ -519,6 +527,7 @@
             scurryPhase: Math.random() * Math.PI * 2,
             squeaked: false,
             deathZoneTime: 0,
+            deathWarningTime: 0,
             spawnScale: isDropped ? 1.0 : 0.0,
             scaleVelocity: 0.0,
             wobbleScaleX: 1.0,
@@ -896,6 +905,7 @@
             Body.setVelocity(cat.body, { x: cData.velocity.x, y: cData.velocity.y });
             Body.setAngularVelocity(cat.body, cData.angularVelocity);
             cat.deathZoneTime = 0;
+            cat.deathWarningTime = 0;
             if (cat.isMouse) {
                 resetMouseEscapeState(cat, false);
                 cat.isRemoved = false;
@@ -993,7 +1003,7 @@
         saveGameSession();
 
         const currentSession = gameSessionId;
-        setTimeout(() => {
+        scheduleGameTask(() => {
             if (currentSession === gameSessionId) {
                 spawnNewCat();
             }
@@ -1001,16 +1011,56 @@
     }
 
     function getClampedX(x, radius) {
-        // Clamp to actual inner walls (Left inner face: 100, Right inner face: 620) with 5px padding
-        const innerLeft = CUP_WALL_LEFT_X + 10;
-        const innerRight = CUP_WALL_RIGHT_X - 10;
-        const minSpawnX = innerLeft + radius + 5;
-        const maxSpawnX = innerRight - radius - 5;
+        const minSpawnX = CUP_INNER_LEFT_X + radius + CUP_WALL_SPAWN_PADDING;
+        const maxSpawnX = CUP_INNER_RIGHT_X - radius - CUP_WALL_SPAWN_PADDING;
         return Math.max(minSpawnX, Math.min(maxSpawnX, x));
     }
 
     function getCatColliderRadius(cat) {
         return cat.radius * CatPhysics.COLLIDER_RADIUS_SCALE;
+    }
+
+    function softenBottomCornerLanding(cat) {
+        if (!cat.isDropped || cat.body.isStatic || cat.isMouse) return;
+
+        const r = getCatColliderRadius(cat);
+        const pos = cat.body.position;
+        const floorCenterY = FLOOR_TOP_Y - r;
+        const nearFloor = pos.y > floorCenterY - CUP_CORNER_LANDING_HEIGHT;
+        if (!nearFloor || cat.body.velocity.y <= CUP_CORNER_LANDING_MAX_SPEED) return;
+
+        const nearLeftCorner = pos.x < CUP_INNER_LEFT_X + r + CUP_CORNER_LANDING_SIDE_PAD;
+        const nearRightCorner = pos.x > CUP_INNER_RIGHT_X - r - CUP_CORNER_LANDING_SIDE_PAD;
+        if (!nearLeftCorner && !nearRightCorner) return;
+
+        let vx = cat.body.velocity.x;
+        if (nearLeftCorner && vx < 0) vx = 0;
+        if (nearRightCorner && vx > 0) vx = 0;
+
+        Body.setVelocity(cat.body, {
+            x: vx,
+            y: CUP_CORNER_LANDING_MAX_SPEED
+        });
+    }
+
+    function prepareCatsForPhysicsStep() {
+        activeCats.forEach(softenBottomCornerLanding);
+    }
+
+    function dampBottomCornerRebound(cat, r) {
+        const pos = cat.body.position;
+        const floorCenterY = FLOOR_TOP_Y - r;
+        const nearFloor = pos.y > floorCenterY - CUP_CORNER_REBOUND_HEIGHT;
+        if (!nearFloor || cat.body.velocity.y >= -CUP_CORNER_REBOUND_MAX_SPEED) return;
+
+        const nearLeftCorner = pos.x < CUP_INNER_LEFT_X + r + CUP_CORNER_LANDING_SIDE_PAD;
+        const nearRightCorner = pos.x > CUP_INNER_RIGHT_X - r - CUP_CORNER_LANDING_SIDE_PAD;
+        if (!nearLeftCorner && !nearRightCorner) return;
+
+        Body.setVelocity(cat.body, {
+            x: cat.body.velocity.x,
+            y: -CUP_CORNER_REBOUND_MAX_SPEED
+        });
     }
 
     function clampCatInCup(cat) {
@@ -1033,20 +1083,19 @@
 
         // 3. Out-of-bounds safety net: only teleport if the cat has genuinely glitched past the cup boundaries
         const r = cat.isMouse ? getMouseColliderRadius(cat) : getCatColliderRadius(cat);
+        if (!cat.isMouse) dampBottomCornerRebound(cat, r);
+
         const pos = cat.body.position;
         let x = pos.x;
         let y = pos.y;
         let needsReset = false;
 
-        const innerLeft = CUP_WALL_LEFT_X + 10;
-        const innerRight = CUP_WALL_RIGHT_X - 10;
-
-        if (x < innerLeft - r - 20) {
-            x = innerLeft + r + 5;
+        if (x < CUP_INNER_LEFT_X - r - 20) {
+            x = CUP_INNER_LEFT_X + r + 5;
             needsReset = true;
         }
-        if (x > innerRight + r + 20) {
-            x = innerRight - r - 5;
+        if (x > CUP_INNER_RIGHT_X + r + 20) {
+            x = CUP_INNER_RIGHT_X - r - 5;
             needsReset = true;
         }
         if (y > FLOOR_TOP_Y + r + 20) {
@@ -1109,6 +1158,7 @@
 
     /** Dev easter egg — only when 11 + 11 pop */
     function triggerBigCatGroomEasterEgg(x, y) {
+        ensureDevPeekImage();
         devPeekEffect = {
             timer: 2.5,
             total: 2.5,
@@ -1656,31 +1706,33 @@
         ctx.restore();
     }
 
-    function drawBackgroundDecorations(colors) {
-        // Staggered grid doodles
-        const cellW = 144.0;
-        const cellH = 142.22;
-        
-        for (let r = 0; r <= 9; r++) {
-            for (let c = -1; c <= 5; c++) {
-                let px = (c + 0.5) * cellW;
-                const py = (r + 0.5) * cellH;
+    function drawBackgroundDecorations(colors, includeStaticDoodles = true, includeCup = true) {
+        if (includeStaticDoodles) {
+            const cellW = 144.0;
+            const cellH = 142.22;
 
-                if (r % 2 === 1) {
-                    px += cellW * 0.5;
-                }
+            for (let r = 0; r <= 9; r++) {
+                for (let c = -1; c <= 5; c++) {
+                    let px = (c + 0.5) * cellW;
+                    const py = (r + 0.5) * cellH;
 
-                const itemIndex = Math.abs(r * 3 + c) % 4;
-                switch (itemIndex) {
-                    case 0: drawCatHead(px, py, 0.72, colors); break;
-                    case 1: drawFishSkeleton(px, py, 0.75, colors); break;
-                    case 2: drawDoubleHearts(px, py, 0.7, colors); break;
-                    case 3: drawBowOrStars(px, py, 0.8, colors); break;
+                    if (r % 2 === 1) {
+                        px += cellW * 0.5;
+                    }
+
+                    const itemIndex = Math.abs(r * 3 + c) % 4;
+                    switch (itemIndex) {
+                        case 0: drawCatHead(px, py, 0.72, colors); break;
+                        case 1: drawFishSkeleton(px, py, 0.75, colors); break;
+                        case 2: drawDoubleHearts(px, py, 0.7, colors); break;
+                        case 3: drawBowOrStars(px, py, 0.8, colors); break;
+                    }
                 }
             }
         }
 
         // Notebook paper cards are now drawn via HTML/CSS directly
+        if (!includeCup) return;
 
         // Draw wobbly Glass Cup boundaries synced to physics walls.
         ctx.save();
@@ -1753,9 +1805,68 @@
         ctx.restore();
     }
 
-    function drawCatSphere(cat) {
-        const x = cat.body.position.x;
-        const y = cat.body.position.y;
+    function getStaticBackgroundCacheKey(colors) {
+        return [
+            GAME_W,
+            GAME_H,
+            colors.paperColor,
+            colors.stripeColor,
+            colors.blushColor,
+            colors.penColor,
+            colors.pencilColor,
+            cupTiltAngle.toFixed(3)
+        ].join("|");
+    }
+
+    function rebuildStaticBackgroundCache(colors) {
+        if (!staticBackgroundCtx) return;
+        const previousCtx = ctx;
+        ctx = staticBackgroundCtx;
+        ctx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0); // фон тоже рендерим в высоком разрешении
+        ctx.globalAlpha = 1;
+        drawBackgroundGingham(colors);
+        drawBackgroundDecorations(colors, true, true);
+        ctx = previousCtx;
+        staticBackgroundCacheKey = getStaticBackgroundCacheKey(colors);
+    }
+
+    function drawSceneBackground(colors) {
+        if (!staticBackgroundCtx) {
+            drawBackgroundGingham(colors);
+            drawBackgroundDecorations(colors);
+            return;
+        }
+
+        const cacheKey = getStaticBackgroundCacheKey(colors);
+        if (staticBackgroundCacheKey !== cacheKey) {
+            rebuildStaticBackgroundCache(colors);
+        }
+
+        ctx.drawImage(staticBackgroundCanvas, 0, 0, GAME_W, GAME_H);
+    }
+
+    function getCatRenderPose(cat, renderAlpha) {
+        const body = cat.body;
+        if (!cat.isDropped || !body.positionPrev) {
+            return {
+                x: body.position.x,
+                y: body.position.y,
+                angle: body.angle
+            };
+        }
+
+        const alpha = Math.max(0, Math.min(1, renderAlpha));
+        return {
+            x: body.positionPrev.x + (body.position.x - body.positionPrev.x) * alpha,
+            y: body.positionPrev.y + (body.position.y - body.positionPrev.y) * alpha,
+            angle: (body.anglePrev ?? body.angle) + (body.angle - (body.anglePrev ?? body.angle)) * alpha
+        };
+    }
+
+    function drawCatSphere(cat, renderAlpha = 1) {
+        const pose = getCatRenderPose(cat, renderAlpha);
+        const x = pose.x;
+        const y = pose.y;
         const radius = cat.radius;
         const level = cat.level;
         
@@ -1764,7 +1875,7 @@
         if (cat.isMouse) {
             ctx.scale(cat.spawnScale, cat.spawnScale);
         } else {
-            ctx.rotate(cat.body.angle);
+            ctx.rotate(pose.angle);
             ctx.scale(cat.spawnScale * cat.wobbleScaleX, cat.spawnScale * cat.wobbleScaleY);
         }
 
@@ -1848,6 +1959,36 @@
         ctx.restore();
     }
 
+    function getCatDeathLineTopY(cat) {
+        const local = worldToCupLocal(cat.body.position.x, cat.body.position.y);
+        return local.y - cat.radius;
+    }
+
+    function updateDeathLineCountdown(cat, delta) {
+        const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
+        const topY = getCatDeathLineTopY(cat);
+        const isSettledNearLine = speed < DEATH_LINE_SPEED_THRESHOLD && topY < CUP_RIM_Y + DEATH_LINE_WARNING_MARGIN;
+
+        if (!isSettledNearLine) {
+            cat.deathWarningTime = 0;
+            cat.deathZoneTime = 0;
+            return 0;
+        }
+
+        cat.deathWarningTime = (cat.deathWarningTime || 0) + delta;
+
+        if (topY < CUP_RIM_Y) {
+            cat.deathZoneTime += delta;
+            if (cat.deathZoneTime > GAME_OVER_HOLD_SECONDS) {
+                triggerGameOver();
+            }
+            return cat.deathZoneTime;
+        }
+
+        cat.deathZoneTime = 0;
+        return Math.min(cat.deathWarningTime, PREWARNING_MAX_SIGNAL_TIME);
+    }
+
     // --- Dynamic DOM State Sync ---
     function formatHudNum(n) {
         return Number(n || 0).toLocaleString("en-US");
@@ -1863,9 +2004,7 @@
 
     function updatePlayerChip() {
         const name = GameState.player_name || "Guest";
-        const nameEl = document.getElementById("player-name-text");
         const avatarEl = document.getElementById("player-avatar");
-        if (nameEl) nameEl.textContent = name;
         if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
     }
 
@@ -1907,8 +2046,7 @@
     }
 
     function updateModeBadge() {
-        const badge = document.getElementById("mode-badge");
-        if (badge) badge.textContent = GameModes.modeLabel(currentGameMode);
+        // Reserved for future mode UI.
     }
 
     function startGameMode(mode) {
@@ -1924,16 +2062,20 @@
 
     function updateAudioButtons() {
         const sfxText = GameState.sfx_enabled ? "🔊" : "🔇";
-        const sfxBtn = document.getElementById("sfx-btn");
         const hudSfxBtn = document.getElementById("hud-sfx-btn");
-        if (sfxBtn) sfxBtn.textContent = sfxText;
-        if (hudSfxBtn) hudSfxBtn.textContent = sfxText;
+        if (hudSfxBtn) {
+            hudSfxBtn.textContent = sfxText;
+            hudSfxBtn.setAttribute("aria-label", GameState.sfx_enabled ? "Turn sound effects off" : "Turn sound effects on");
+            hudSfxBtn.setAttribute("aria-pressed", GameState.sfx_enabled ? "true" : "false");
+        }
 
         const musicText = GameState.music_enabled ? "🎵" : "⏸️";
-        const musicBtn = document.getElementById("music-btn");
         const hudMusicBtn = document.getElementById("hud-music-btn");
-        if (musicBtn) musicBtn.textContent = musicText;
-        if (hudMusicBtn) hudMusicBtn.textContent = musicText;
+        if (hudMusicBtn) {
+            hudMusicBtn.textContent = musicText;
+            hudMusicBtn.setAttribute("aria-label", GameState.music_enabled ? "Turn music off" : "Turn music on");
+            hudMusicBtn.setAttribute("aria-pressed", GameState.music_enabled ? "true" : "false");
+        }
     }
 
     // --- Game Over Sequence ---
@@ -2061,16 +2203,25 @@
     // --- Main Game Loop (Physics & Animation ticks) ---
     function gameLoop(time) {
         const delta = Math.min((time - lastTime) / 1000.0, 0.25); // cap delta to prevent death spiral
-        const dt60 = delta * 60; // 1.0 при 60fps — коэффициент кадронезависимости эффектов
         lastTime = time;
+        const simulationPaused = isSimulationPaused();
+        if (simulationPaused && time - lastPausedRender < 100) {
+            physicsAccumulator = 0;
+            requestAnimationFrame(gameLoop);
+            return;
+        }
+        if (simulationPaused) lastPausedRender = time;
+        const activeDelta = simulationPaused ? 0 : delta;
+        const dt60 = activeDelta * 60; // 1.0 при 60fps — коэффициент кадронезависимости эффектов
 
         // Step physics engine (fixed 1/60s timestep accumulator, QA-check compliant using timeRemaining and maxStep)
-        if (!isGameOver) {
-            physicsAccumulator += delta;
+        if (!isGameOver && !simulationPaused) {
+            physicsAccumulator += activeDelta;
             const maxStep = 1.0 / 60.0;
             let timeRemaining = physicsAccumulator;
             while (timeRemaining >= maxStep) {
                 settleCupIfNeeded(maxStep);
+                prepareCatsForPhysicsStep();
                 Engine.update(engine, 1000 / 60);
                 clampAllCatsInCup();
                 updateMice(maxStep);
@@ -2078,16 +2229,18 @@
                 timeRemaining -= maxStep;
             }
             physicsAccumulator = timeRemaining;
+        } else {
+            physicsAccumulator = 0;
         }
+        const renderAlpha = !isGameOver && !simulationPaused ? Math.min(1, physicsAccumulator / (1.0 / 60.0)) : 1;
 
         // Clear draw buffers and offset context for screen shake
         ctx.save();
-        updateCameraShake(delta);
+        ctx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0); // базовый апскейл под резкость
+        updateCameraShake(activeDelta);
         ctx.translate(shakeOffsetX, shakeOffsetY);
 
-        // Render Background Gingham & hand-drawn doodles
-        drawBackgroundGingham(currentThemeColors);
-        drawBackgroundDecorations(currentThemeColors);
+        drawSceneBackground(currentThemeColors);
 
         // Update & Render Particles
         particles.forEach((p, idx) => {
@@ -2134,26 +2287,14 @@
         // Render Dropped Cats
         let maxDeathTime = 0.0;
         activeCats.forEach(cat => {
-            drawCatSphere(cat);
+            drawCatSphere(cat, renderAlpha);
 
             // Пружины появления/сквоша — кадронезависимо (см. updateCatVisualAnimation)
             updateCatVisualAnimation(cat, dt60);
 
             // Death zone countdown checking
-            if (!isGameOver && cat.isDropped && !cat.isMouse) {
-                const speed = Math.hypot(cat.body.velocity.x, cat.body.velocity.y);
-                const localY = worldToCupLocal(cat.body.position.x, cat.body.position.y).y;
-                if (speed < 0.8 && localY < CUP_RIM_Y) {
-                    cat.deathZoneTime += delta;
-                    if (cat.deathZoneTime > maxDeathTime) {
-                        maxDeathTime = cat.deathZoneTime;
-                    }
-                    if (cat.deathZoneTime > 3.0) {
-                        triggerGameOver();
-                    }
-                } else {
-                    cat.deathZoneTime = 0.0;
-                }
+            if (!isGameOver && !simulationPaused && cat.isDropped && !cat.isMouse) {
+                maxDeathTime = Math.max(maxDeathTime, updateDeathLineCountdown(cat, activeDelta));
             }
         });
 
@@ -2173,7 +2314,7 @@
 
         // Render Un-dropped cat following guides
         if (currentCat && !isGameOver) {
-            drawCatSphere(currentCat);
+            drawCatSphere(currentCat, renderAlpha);
 
             // Пружины появления/сквоша текущего кота — тот же кадронезависимый хелпер
             updateCatVisualAnimation(currentCat, dt60);
@@ -2190,9 +2331,10 @@
     // --- Input listeners mapped to Canvas dimensions ---
     function getInternalCoordinates(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
-        // Convert screen coordinates to canvas internal (720x1280) logical coordinates
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
+        // Convert screen coordinates to canvas internal (720x1280) LOGICAL coordinates.
+        // Используем логические GAME_W/GAME_H, а не canvas.width (буфер теперь крупнее из-за RENDER_SCALE).
+        const scaleX = GAME_W / rect.width;
+        const scaleY = GAME_H / rect.height;
         return {
             x: (clientX - rect.left) * scaleX,
             y: (clientY - rect.top) * scaleY
@@ -2358,51 +2500,50 @@
 
     function resumeGameSession() {
         const data = GameState.loadActiveSession();
-        if (data) {
-            activeCats.forEach(c => Composite.remove(engine.world, c.body));
-            activeCats = [];
+        if (!data) {
+            discardGameSession();
+            return;
+        }
 
-            GameState.score = data.score;
-            GameState.fish_coins = data.fish_coins;
-            currentGameMode = GameModes.MODES.CLASSIC;
-            cupTiltAngle = 0;
-            cupTiltTarget = 0;
-            applyCupGravity();
+        activeCats.forEach(c => Composite.remove(engine.world, c.body));
+        activeCats = [];
 
-            totalDropsThisSession = data.total_drops || data.cats.length;
+        GameState.score = data.score;
+        GameState.fish_coins = data.fish_coins;
+        currentGameMode = GameModes.MODES.CLASSIC;
+        cupTiltAngle = 0;
+        cupTiltTarget = 0;
+        applyCupGravity();
 
-            if (data.next_spawn) {
-                nextSpawn = ensureSpawnAllowed(data.next_spawn);
-            } else if (data.next_cat_level !== undefined) {
-                nextSpawn = ensureSpawnAllowed({ level: data.next_cat_level, special: null });
+        totalDropsThisSession = data.total_drops || data.cats.length;
+
+        nextSpawn = ensureSpawnAllowed(data.next_spawn);
+
+        data.cats.forEach(cData => {
+            const spec = {
+                level: cData.level,
+                special: cData.special || null
+            };
+            const cat = spawnEntity(spec, cData.pos_x, cData.pos_y, true);
+
+            Body.setPosition(cat.body, { x: cData.pos_x, y: cData.pos_y });
+            Body.setAngle(cat.body, cData.rot);
+            Body.setStatic(cat.body, false);
+            Body.setVelocity(cat.body, { x: cData.vel_x, y: cData.vel_y });
+            Body.setAngularVelocity(cat.body, cData.ang_vel);
+
+            if (cat.isMouse) {
+                resetMouseEscapeState(cat, true);
+                cat.spawnScale = 1.0;
             }
 
-            data.cats.forEach(cData => {
-                const spec = {
-                    level: cData.level,
-                    special: cData.special || null
-                };
-                const cat = spawnEntity(spec, cData.pos_x, cData.pos_y, true);
+            World.add(engine.world, cat.body);
+            activeCats.push(cat);
+        });
 
-                Body.setPosition(cat.body, { x: cData.pos_x, y: cData.pos_y });
-                Body.setAngle(cat.body, cData.rot);
-                Body.setStatic(cat.body, false);
-                Body.setVelocity(cat.body, { x: cData.vel_x, y: cData.vel_y });
-                Body.setAngularVelocity(cat.body, cData.ang_vel);
-
-                if (cat.isMouse) {
-                    resetMouseEscapeState(cat, true);
-                    cat.spawnScale = 1.0;
-                }
-
-                World.add(engine.world, cat.body);
-                activeCats.push(cat);
-            });
-
-            spawnNewCat();
-            updateHUD();
-            updateModeBadge();
-        }
+        spawnNewCat();
+        updateHUD();
+        updateModeBadge();
 
         GameState.deleteActiveSession();
         closeAllModals();
@@ -2511,21 +2652,43 @@
         return document.querySelectorAll(".modal-overlay.active").length > 0;
     }
 
+    function isSettingsMenuOpen() {
+        return document.getElementById("settings-menu")?.classList.contains("active") || false;
+    }
+
+    function isSimulationPaused() {
+        return document.hidden || isModalOpen() || isSettingsMenuOpen();
+    }
+
+    function setModalActive(modal, active) {
+        if (!modal) return;
+        modal.classList.toggle("active", active);
+        modal.setAttribute("aria-hidden", active ? "false" : "true");
+        modal.inert = !active;
+        physicsAccumulator = 0;
+    }
+
+    function syncModalAccessibility() {
+        document.querySelectorAll(".modal-overlay").forEach(modal => {
+            setModalActive(modal, modal.classList.contains("active"));
+        });
+    }
+
     function openModal(modal) {
-        modal.classList.add("active");
+        setModalActive(modal, true);
         canDrop = false;
     }
 
     function closeModal(modal) {
-        modal.classList.remove("active");
-        if (!isModalOpen() && !isGameOver && !isTargetingEraser) {
+        setModalActive(modal, false);
+        if (!isModalOpen() && !isSettingsMenuOpen() && !isGameOver && !isTargetingEraser) {
             canDrop = true;
         }
     }
 
     function closeAllModals() {
-        document.querySelectorAll(".modal-overlay").forEach(m => m.classList.remove("active"));
-        if (!isGameOver && !isTargetingEraser) {
+        document.querySelectorAll(".modal-overlay").forEach(modal => setModalActive(modal, false));
+        if (!isSettingsMenuOpen() && !isGameOver && !isTargetingEraser) {
             canDrop = true;
         }
     }
@@ -2813,11 +2976,11 @@
                     <div class="shop-item-info">
                         <span class="shop-item-name">${tName}</span>
                     </div>
-                    <div class="shop-item-actions" id="action-theme-${tName.replace(" ", "")}"></div>
+                    <div class="shop-item-actions"></div>
                 `;
                 container.appendChild(row);
 
-                const actContainer = document.getElementById(`action-theme-${tName.replace(" ", "")}`);
+                const actContainer = row.querySelector(".shop-item-actions");
                 const btn = document.createElement("button");
                 btn.className = "paper-button shop-btn-buy";
                 if (isActive) {
@@ -2869,11 +3032,11 @@
                         <span class="shop-item-name">${info.name}</span>
                         <span class="shop-item-desc">${info.desc}</span>
                     </div>
-                    <div class="shop-item-actions" id="action-skin-${skinId}"></div>
+                    <div class="shop-item-actions"></div>
                 `;
                 container.appendChild(row);
 
-                const actContainer = document.getElementById(`action-skin-${skinId}`);
+                const actContainer = row.querySelector(".shop-item-actions");
                 if (isOwned) {
                     // Replacer drop-down select list
                     const assignLbl = document.createElement("span");
@@ -2914,11 +3077,17 @@
 
         } else if (currentShopTab === "Sounds") {
             const soundSets = {
-                "Mystic": { name: "Halloween Sound Set", cost: 10000, desc: "Owl hoots, witch chimes & spooky loop" },
-                "Rapper": { name: "Rapper Sound Set", cost: 10000, desc: "Vinyl scratches, boom-bap beat & hi-hats" },
-                "Zombie": { name: "Zombie Sound Set", cost: 10000, desc: "Guttural groans & shambling horror march" },
-                "Vampire": { name: "Vampire Sound Set", cost: 10000, desc: "Gothic \"Boo!\", organ stabs & dark waltz" },
-                "Oldman": { name: "Oldman Sound Set", cost: 10000, desc: "Grumpy coughs & nostalgic music-box waltz" }
+                "Mystic": { name: "Moonwhisker Pixel Pack", cost: 24000, desc: "BGM: Midnight Purrcade; SFX: Star Paw Pops" },
+                "Rapper": { name: "Alley Cat Beat Pack", cost: 27000, desc: "BGM: Meow-Hop Rooftops; SFX: Scratch Bounce Hits" },
+                "Zombie": { name: "Nine Lives Glitch Pack", cost: 30000, desc: "BGM: Purranormal Pixels; SFX: Crunchy Paw Drops" },
+                "Vampire": { name: "Velvet Fang Chip Pack", cost: 33000, desc: "BGM: Bat-Cat Waltz; SFX: Crystal Fang Merges" },
+                "Oldman": { name: "Grandpaw Arcade Pack", cost: 36000, desc: "BGM: Rocking Chair Quest; SFX: Soft Button Boops" },
+                "ChipCozy": { name: "Cozy Café · beat ✨", cost: 6000, desc: "Уютное кафе, чиптюн с ударными" },
+                "ChipSunny": { name: "Sunny Arcade · beat ✨", cost: 6000, desc: "Задорный аркадный чип с битом" },
+                "ChipMoon": { name: "Moonlit Nap · beat ✨", cost: 6000, desc: "Мечтательная колыбельная с ритмом" },
+                "ChipCozyCalm": { name: "Cozy Café · calm ✨", cost: 6000, desc: "То же кафе, минимал, без ударных" },
+                "ChipSunnyCalm": { name: "Sunny · calm ✨", cost: 6000, desc: "Мягкий аркадный, спокойнее" },
+                "ChipMoonCalm": { name: "Moonlit · calm ✨", cost: 6000, desc: "Тихая колыбельная, минимал" }
             };
 
             // Render default sounds first
@@ -2929,11 +3098,11 @@
                     <span class="shop-item-name">Default Sounds</span>
                     <span class="shop-item-desc">Cozy cat-cafe loop &amp; warm bloop sounds</span>
                 </div>
-                <div class="shop-item-actions" id="action-sound-Default"></div>
+                <div class="shop-item-actions"></div>
             `;
             container.appendChild(defaultRow);
 
-            const defActContainer = document.getElementById("action-sound-Default");
+            const defActContainer = defaultRow.querySelector(".shop-item-actions");
             
             const defDemoBtn = document.createElement("button");
             defDemoBtn.className = "paper-button";
@@ -2960,7 +3129,7 @@
             defActContainer.appendChild(defBtn);
 
             // Themed sounds order
-            const soundsOrder = ["Mystic", "Rapper", "Zombie", "Vampire", "Oldman"];
+            const soundsOrder = ["ChipCozy", "ChipCozyCalm", "ChipSunny", "ChipSunnyCalm", "ChipMoon", "ChipMoonCalm", "Mystic", "Rapper", "Zombie", "Vampire", "Oldman"];
             soundsOrder.forEach(soundId => {
                 const info = soundSets[soundId];
                 const isOwned = GameState.purchased_sounds.includes(soundId);
@@ -2973,11 +3142,11 @@
                         <span class="shop-item-name">${info.name}</span>
                         <span class="shop-item-desc">${info.desc}</span>
                     </div>
-                    <div class="shop-item-actions" id="action-sound-${soundId}"></div>
+                    <div class="shop-item-actions"></div>
                 `;
                 container.appendChild(row);
 
-                const actContainer = document.getElementById(`action-sound-${soundId}`);
+                const actContainer = row.querySelector(".shop-item-actions");
                 
                 const demoBtn = document.createElement("button");
                 demoBtn.className = "paper-button";
@@ -3138,18 +3307,68 @@
     function connectEvents() {
         const settingsToggleBtn = document.getElementById("main-menu-btn");
         const settingsMenu = document.getElementById("settings-menu");
+        const settingsBackdrop = document.getElementById("settings-menu-backdrop");
+        const settingsCloseBtn = document.getElementById("menu-close-btn");
         
         if (settingsToggleBtn && settingsMenu) {
+            const setSettingsMenuOpen = (isOpen) => {
+                settingsMenu.classList.toggle("active", isOpen);
+                if (settingsBackdrop) settingsBackdrop.classList.toggle("active", isOpen);
+                settingsToggleBtn.classList.toggle("active", isOpen);
+                settingsToggleBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+                settingsToggleBtn.setAttribute("aria-label", isOpen ? "Close menu" : "Open menu");
+                settingsMenu.setAttribute("aria-hidden", isOpen ? "false" : "true");
+                settingsMenu.inert = !isOpen;
+                physicsAccumulator = 0;
+                if (isOpen) {
+                    canDrop = false;
+                } else if (!isModalOpen() && !isGameOver && !isTargetingEraser) {
+                    canDrop = true;
+                }
+            };
+
+            setSettingsMenuOpen(false);
+            window.addEventListener("closeSettingsMenuViaBackButton", () => setSettingsMenuOpen(false));
+
             settingsToggleBtn.onclick = (e) => {
                 e.stopPropagation(); // prevent document click from immediately closing it
-                settingsMenu.classList.toggle("active");
-                playClickSound();
+                setSettingsMenuOpen(!settingsMenu.classList.contains("active"));
+                playUiClickSound();
             };
+
+            settingsMenu.addEventListener("click", (e) => {
+                e.stopPropagation();
+            });
+
+            if (settingsBackdrop) {
+                settingsBackdrop.addEventListener("click", () => {
+                    setSettingsMenuOpen(false);
+                    playUiClickSound();
+                });
+            }
+
+            if (settingsCloseBtn) {
+                settingsCloseBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    setSettingsMenuOpen(false);
+                    playUiClickSound();
+                });
+            }
+
+            settingsMenu.querySelectorAll(".menu-item-btn:not([disabled])").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    setSettingsMenuOpen(false);
+                });
+            });
             
             document.addEventListener("click", (e) => {
                 if (!settingsMenu.contains(e.target) && e.target !== settingsToggleBtn) {
-                    settingsMenu.classList.remove("active");
+                    setSettingsMenuOpen(false);
                 }
+            });
+
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") setSettingsMenuOpen(false);
             });
         }
 
@@ -3161,7 +3380,6 @@
             updateAudioButtons();
             if (GameState.sfx_enabled) playMergeSound(1.0);
         };
-        document.getElementById("sfx-btn").onclick = toggleSfx;
         const hudSfx = document.getElementById("hud-sfx-btn");
         if (hudSfx) hudSfx.onclick = toggleSfx;
 
@@ -3173,7 +3391,6 @@
             updateAudioButtons();
             updateBGMState();
         };
-        document.getElementById("music-btn").onclick = toggleMusic;
         const hudMusic = document.getElementById("hud-music-btn");
         if (hudMusic) hudMusic.onclick = toggleMusic;
 
@@ -3207,7 +3424,7 @@
 
         // Leaderboard Overlay
         document.getElementById("leaderboard-btn").onclick = async () => {
-            playClickSound();
+            playUiClickSound();
             if (window.PlayGames && GPGS_LEADERBOARD_ID) {
                 const shown = await window.PlayGames.showLeaderboard(GPGS_LEADERBOARD_ID);
                 if (shown) return;
@@ -3277,17 +3494,17 @@
     // --- Game Engine Startup Sequence ---
     window.addEventListener("load", () => {
         if (window.PlayGames) window.PlayGames.init();
-        
-        window.addEventListener("modalClosedViaBackButton", () => {
-            // BUG-A fix: не затираем функцию isModalOpen(); просто восстанавливаем ввод,
-            // если ни одно окно не открыто, игра не окончена и не активен ластик.
-            if (!pendingGameOver && !isTargetingEraser && !isGameOver && !isModalOpen()) {
-                canDrop = true;
-            }
-        });
+
+        syncModalAccessibility();
+        window.addEventListener("closeModalsViaBackButton", closeAllModals);
         window.addEventListener("cancelEraserViaBackButton", () => {
             isTargetingEraser = false;
             updateTargetingUI();
+        });
+        document.addEventListener("visibilitychange", () => {
+            lastTime = performance.now();
+            physicsAccumulator = 0;
+            updateBGMState();
         });
         let imagesReady = false;
         let audioReady = false;
@@ -3335,7 +3552,7 @@
             tryStart();
         });
 
-        GameAudio.preload(() => {
+        GameAudio.preload(GameState.active_sound_set, () => {
             GameAudio.setMusicEnabled(GameState.music_enabled);
             GameAudio.setSfxEnabled(GameState.sfx_enabled);
             audioReady = true;

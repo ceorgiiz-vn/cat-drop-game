@@ -7,7 +7,8 @@
     "start": "serve www -l tcp://0.0.0.0:${PORT:-8080} -n",
     "serve:local": "serve www -l tcp://0.0.0.0:8080 -n",
     "check": "node scripts/release-check.mjs",
-    "qa": "python scripts/qa_checks.py"
+    "qa": "python scripts/qa_checks.py",
+    "qa:full": "node scripts/full-game-qa.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
