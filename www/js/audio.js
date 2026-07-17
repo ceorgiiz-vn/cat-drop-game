@@ -3,6 +3,7 @@
 const GameAudio = (function() {
     const ENABLE_BGM = true;
     const MUSIC_GAIN = 0.20;
+    const scheduleAudioTask = globalThis.setTimeout.bind(globalThis);
 
     const SETS = {
         Default: { suffix: "", bgm: "bgm.wav" },
@@ -10,21 +11,31 @@ const GameAudio = (function() {
         Rapper:  { suffix: "_rapper",  bgm: "bgm_rapper.wav" },
         Zombie:  { suffix: "_zombie",  bgm: "bgm_zombie.wav" },
         Vampire: { suffix: "_vampire", bgm: "bgm_vampire.wav" },
-        Oldman:  { suffix: "_oldman",  bgm: "bgm_oldman.wav" }
+        Oldman:  { suffix: "_oldman",  bgm: "bgm_oldman.wav" },
+        // Новые чиптюн-треки (BGM), SFX — стандартные (suffix "")
+        ChipCozy:  { suffix: "", bgm: "bgm_chip_cozy.wav" },
+        ChipSunny: { suffix: "", bgm: "bgm_chip_sunny.wav" },
+        ChipMoon:  { suffix: "", bgm: "bgm_chip_moon.wav" },
+        ChipCozyCalm:  { suffix: "", bgm: "bgm_chip_cozy_calm.wav" },
+        ChipSunnyCalm: { suffix: "", bgm: "bgm_chip_sunny_calm.wav" },
+        ChipMoonCalm:  { suffix: "", bgm: "bgm_chip_moon_calm.wav" }
     };
 
     let ctx = null;
     let musicBus = null;
     let sfxBus = null;
     let buffers = {};
+    const loadingBuffers = new Map();
     let currentSet = "Default";
     let bgmSource = null;
+    let wantBGM = false; // BUG-музыка: помним намерение играть и стартуем, как только буфер готов
     let musicEnabled = true;
     let sfxEnabled = true;
     let ready = false;
     let lastDropAt = 0;
     let lastMergeAt = 0;
     let devEggBuffer = null;
+    let devEggPromise = null;
 
     function ensureContext() {
         if (!ctx) {
@@ -45,10 +56,6 @@ const GameAudio = (function() {
             musicBus.connect(compressor);
             sfxBus.connect(compressor);
         }
-        if (ctx.state === "suspended") {
-            // Do NOT return ctx.resume() here. It will hang the promise forever
-            // if the browser blocks autoplay. Let unlockAudio() handle resuming later.
-        }
         return Promise.resolve();
     }
 
@@ -68,41 +75,49 @@ const GameAudio = (function() {
         return ctx.decodeAudioData(data);
     }
 
-    async function preload(callback) {
+    function ensureBuffer(setName, type) {
+        if (!SETS[setName]) setName = "Default";
+        const key = bufferKey(setName, type);
+        if (buffers[key]) return Promise.resolve(buffers[key]);
+        if (loadingBuffers.has(key)) return loadingBuffers.get(key);
+
+        const cfg = SETS[setName];
+        const file = type === "bgm" ? cfg.bgm : sfxFile(type, cfg.suffix);
+        const url = `assets/audio/${file}`;
+        const promise = loadBuffer(url)
+            .then(buffer => {
+                buffers[key] = buffer;
+                // Как только догрузился нужный BGM — пробуем стартовать (если музыку уже хотели)
+                if (type === "bgm") maybeStartBGM();
+                return buffer;
+            })
+            .catch(error => {
+                console.warn("Missing audio:", url, error);
+                return null;
+            })
+            .finally(() => loadingBuffers.delete(key));
+        loadingBuffers.set(key, promise);
+        return promise;
+    }
+
+    function ensureSoundSet(setName) {
+        const types = ["drop", "merge", "game_over"];
+        if (ENABLE_BGM) types.push("bgm");
+        return Promise.all(types.map(type => ensureBuffer(setName, type)));
+    }
+
+    async function preload(setName, callback) {
         try {
             await ensureContext();
-
-            const tasks = [];
-            for (const [setName, cfg] of Object.entries(SETS)) {
-                for (const type of ["drop", "merge", "game_over"]) {
-                    const url = `assets/audio/${sfxFile(type, cfg.suffix)}`;
-                    const key = bufferKey(setName, type);
-                    tasks.push(
-                        loadBuffer(url)
-                            .then(buf => { buffers[key] = buf; })
-                            .catch(err => console.warn("Missing SFX:", url, err))
-                    );
-                }
-                if (!ENABLE_BGM) continue;
-                const bgmUrl = `assets/audio/${cfg.bgm}`;
-                tasks.push(
-                    loadBuffer(bgmUrl)
-                        .then(buf => { buffers[bufferKey(setName, "bgm")] = buf; })
-                        .catch(err => console.warn("Missing BGM:", bgmUrl, err))
-                );
-            }
-
+            const activeSet = SETS[setName] ? setName : "Default";
+            const tasks = [ensureSoundSet("Default")];
+            if (activeSet !== "Default") tasks.push(ensureSoundSet(activeSet));
             await Promise.all(tasks);
-
-            try {
-                devEggBuffer = await loadBuffer("assets/audio/dev_egg.wav");
-            } catch (err) {
-                console.warn("Missing dev egg SFX:", err);
-            }
         } catch (err) {
             console.error("Audio preload error:", err);
         } finally {
             ready = true;
+            maybeStartBGM(); // буферы готовы: если музыку уже хотели (был тап) — стартуем сразу
             if (callback) callback();
         }
     }
@@ -123,7 +138,7 @@ const GameAudio = (function() {
         musicBus.gain.setValueAtTime(musicBus.gain.value, t);
         musicBus.gain.linearRampToValueAtTime(0, t + fadeMs / 1000);
         try { src.stop(t + fadeMs / 1000 + 0.05); } catch (_) {}
-        setTimeout(() => {
+        scheduleAudioTask(() => {
             try { src.disconnect(); } catch (_) {}
             if (musicEnabled) musicBus.gain.value = MUSIC_GAIN;
         }, fadeMs + 60);
@@ -146,8 +161,27 @@ const GameAudio = (function() {
         bgmSource = src;
     }
 
-    function resumeIfNeeded() {
-        return ensureContext();
+    // Стартует BGM, когда сложились ВСЕ условия: музыку хотят, движок готов,
+    // контекст разблокирован и нужный буфер уже загружен. Вызывается и после
+    // разблокировки звука, и после догрузки буфера — что наступит позже.
+    function maybeStartBGM() {
+        if (!ENABLE_BGM || !ctx || !musicEnabled || !ready || !wantBGM) return;
+        if (ctx.state === "suspended") return;
+        if (bgmSource) return;
+        const buf = buffers[bufferKey(currentSet, "bgm")] || buffers[bufferKey("Default", "bgm")];
+        if (!buf) return;
+        startBGM(currentSet);
+    }
+
+    async function resumeIfNeeded() {
+        await ensureContext();
+        if (ctx.state !== "suspended") return;
+        try {
+            await Promise.race([
+                ctx.resume(),
+                new Promise(resolve => scheduleAudioTask(resolve, 750))
+            ]);
+        } catch (_) {}
     }
 
     function setMusicEnabled(on) {
@@ -162,10 +196,16 @@ const GameAudio = (function() {
     function loadSoundSet(setName) {
         if (!SETS[setName]) setName = "Default";
         currentSet = setName;
-        if (musicEnabled && ready) {
-            stopBGM(80);
-            setTimeout(() => startBGM(currentSet), 90);
-        }
+        const requestedSet = setName;
+        return ensureContext()
+            .then(() => ensureSoundSet(requestedSet))
+            .then(() => {
+                if (!musicEnabled || !ready || currentSet !== requestedSet) return;
+                stopBGM(80);
+                scheduleAudioTask(() => {
+                    if (currentSet === requestedSet) startBGM(requestedSet);
+                }, 90);
+            });
     }
 
     function playOneShot(type, setName, pitch, volume) {
@@ -208,13 +248,66 @@ const GameAudio = (function() {
         resumeIfNeeded().then(() => playOneShot("game_over", currentSet, 1.0, 1.0));
     }
 
+    // Превью в магазине: играем САМУ музыку пака ~8с и ВСЕГДА слышно —
+    // даже когда звук/музыка выключены в игре (идёт мимо флага mute, прямо на выход).
+    let previewSource = null;
+    let previewTimer = null;
+    function stopPreview() {
+        if (previewTimer) { clearTimeout(previewTimer); previewTimer = null; }
+        if (previewSource) {
+            try { previewSource.stop(); } catch (_) {}
+            try { previewSource.disconnect(); } catch (_) {}
+            previewSource = null;
+        }
+        if (musicBus && musicEnabled) musicBus.gain.value = MUSIC_GAIN; // снять приглушение фоновой музыки
+    }
     function playPreview(setName) {
-        resumeIfNeeded().then(() => playOneShot("merge", setName || currentSet, 1.0, 0.95));
+        const previewSet = SETS[setName] ? setName : currentSet;
+        resumeIfNeeded()
+            .then(() => ensureBuffer(previewSet, "bgm"))
+            .then(buf => {
+                if (!ctx || !buf) return;
+                stopPreview();
+                if (musicBus) musicBus.gain.value = 0.0; // приглушаем текущую музыку, чтобы не накладывалась
+                const g = ctx.createGain();
+                g.gain.value = 0.32; // слышимо независимо от того, включён ли звук в игре
+                const src = ctx.createBufferSource();
+                src.buffer = buf;
+                src.loop = false;
+                src.connect(g);
+                g.connect(ctx.destination); // мимо sfx/music-шины и флага mute
+                const t = ctx.currentTime;
+                const dur = Math.min(8, buf.duration || 8);
+                g.gain.setValueAtTime(g.gain.value, t + Math.max(0.1, dur - 0.4));
+                g.gain.linearRampToValueAtTime(0.0001, t + dur);
+                src.start(0);
+                try { src.stop(t + dur + 0.05); } catch (_) {}
+                previewSource = src;
+                src.onended = () => {
+                    if (previewSource === src) previewSource = null;
+                    try { src.disconnect(); g.disconnect(); } catch (_) {}
+                    if (musicBus && musicEnabled) musicBus.gain.value = MUSIC_GAIN;
+                };
+                previewTimer = scheduleAudioTask(() => {
+                    if (musicBus && musicEnabled) musicBus.gain.value = MUSIC_GAIN;
+                }, (dur + 0.25) * 1000);
+            })
+            .catch(() => {});
     }
 
     function playGroomLick() {
-        if (!ctx || !sfxEnabled) return;
+        if (!sfxEnabled) return;
         resumeIfNeeded().then(() => {
+            if (!devEggPromise) {
+                devEggPromise = loadBuffer("assets/audio/dev_egg.wav")
+                    .then(buffer => {
+                        devEggBuffer = buffer;
+                        return buffer;
+                    })
+                    .catch(() => null);
+            }
+            return devEggPromise;
+        }).then(() => {
             if (devEggBuffer) {
                 const src = ctx.createBufferSource();
                 src.buffer = devEggBuffer;
@@ -268,13 +361,14 @@ const GameAudio = (function() {
     }
 
     function updateBGM(shouldPlay) {
+        wantBGM = !!shouldPlay;
         if (!ENABLE_BGM) {
             if (bgmSource) stopBGM(0);
             return;
         }
         resumeIfNeeded().then(() => {
-            if (shouldPlay && musicEnabled && ready) {
-                if (!bgmSource) startBGM(currentSet);
+            if (wantBGM && musicEnabled && ready) {
+                maybeStartBGM(); // если буфер ещё не готов — стартанёт сам по факту загрузки
             } else if (bgmSource) {
                 stopBGM(180);
             }

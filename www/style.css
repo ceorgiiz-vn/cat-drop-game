@@ -21,8 +21,8 @@
     /* Адаптивность HUD: всё считается от ширины игрового поля --gw (эталон 720),
        поэтому HUD одинаково хорошо смотрится на узких телефонах, складных и планшетах. */
     --hud-plate-w: calc(167 / 720 * var(--gw));   /* ширина плашек Score/Next */
-    --hud-right-w: calc(232 / 720 * var(--gw));   /* ширина правой колонки */
-    --hud-btn: clamp(30px, calc(67 / 720 * var(--gw)), 48px); /* кнопки звука/меню */
+    --hud-right-w: max(144px, calc(232 / 720 * var(--gw)));   /* ширина правой колонки */
+    --hud-btn: clamp(44px, calc(67 / 720 * var(--gw)), 48px); /* зона нажатия; значок остаётся компактным */
     --hud-gap: calc(14 / 720 * var(--gw));
     --hud-pad-y: calc(10 / 720 * var(--gw));
     --hud-pad-x: calc(17 / 720 * var(--gw));
@@ -398,6 +398,12 @@ body {
     background: rgba(40, 45, 70, 0.9);
 }
 
+.hamburger-btn.active {
+    color: #ffffff;
+    border-color: rgba(236, 205, 151, 0.45);
+    background: rgba(43, 49, 78, 0.86);
+}
+
 /* --- Records Grid Plate (2x2 grid) --- */
 .hud-records-plate {
     background: var(--hud-panel-bg);
@@ -421,55 +427,225 @@ body {
 
 
 
-.expandable-menu {
-    position: absolute;
-    top: 110%;
-    right: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    background: rgba(15, 18, 30, 0.95);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    padding: 8px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+.menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 230;
+    background: rgba(3, 5, 14, 0.64);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     opacity: 0;
     pointer-events: none;
-    transform: translateY(-8px);
-    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    min-width: 140px;
-    z-index: 200;
+    transition: opacity 0.2s ease;
+}
+
+.menu-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.expandable-menu {
+    position: fixed;
+    top: 53%;
+    left: 50%;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, calc(18 / 720 * var(--gw)), 16px);
+    width: min(calc(var(--gw) * 0.78), 410px);
+    max-width: calc(100vw - 28px);
+    padding: clamp(18px, calc(30 / 720 * var(--gw)), 24px);
+    padding-left: clamp(25px, calc(42 / 720 * var(--gw)), 34px);
+    background:
+        radial-gradient(circle at 82% 8%, rgba(184, 142, 92, 0.1), transparent 30%),
+        repeating-linear-gradient(to bottom, transparent 0 30px, rgba(104, 126, 178, 0.1) 31px 32px),
+        linear-gradient(180deg, rgba(31, 37, 63, 0.985), rgba(17, 21, 38, 0.985));
+    border: 2px solid rgba(135, 126, 160, 0.62);
+    border-radius: 18px 22px 20px 18px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(-50%, -47%) scale(0.94) rotate(-0.8deg);
+    transform-origin: center;
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow:
+        0 24px 55px rgba(0, 0, 0, 0.62),
+        0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+        10px 10px 0 rgba(8, 10, 20, 0.32);
+    z-index: 240;
+}
+
+.expandable-menu::before {
+    content: "";
+    position: absolute;
+    left: clamp(10px, calc(18 / 720 * var(--gw)), 16px);
+    top: clamp(60px, calc(86 / 720 * var(--gw)), 78px);
+    bottom: clamp(24px, calc(40 / 720 * var(--gw)), 34px);
+    width: 8px;
+    border-radius: 999px;
+    background: repeating-radial-gradient(circle at 50% 8px, rgba(174, 148, 118, 0.66) 0 3px, transparent 4px 22px);
+    opacity: 0.72;
+}
+
+.expandable-menu::after {
+    content: "";
+    position: absolute;
+    left: clamp(38px, calc(62 / 720 * var(--gw)), 54px);
+    top: -18px;
+    width: clamp(20px, calc(34 / 720 * var(--gw)), 30px);
+    height: clamp(54px, calc(82 / 720 * var(--gw)), 70px);
+    border: 3px solid rgba(184, 154, 121, 0.72);
+    border-radius: 999px;
+    transform: rotate(-10deg);
+    box-shadow: inset 0 0 0 6px rgba(20, 24, 42, 0.94), 0 6px 14px rgba(0, 0, 0, 0.34);
 }
 
 .expandable-menu.active {
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
-    transform: translateY(0);
+    transform: translate(-50%, -50%) scale(1) rotate(-0.8deg);
+}
+
+.menu-sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed rgba(135, 126, 160, 0.28);
+}
+
+.menu-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.menu-sheet-label {
+    color: rgba(196, 171, 128, 0.72);
+    font-size: clamp(10px, calc(18 / 720 * var(--gw)), 13px);
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.menu-sheet-title {
+    color: #ded7d1;
+    font-size: clamp(24px, calc(44 / 720 * var(--gw)), 34px);
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+}
+
+.menu-close-btn {
+    width: clamp(31px, calc(49 / 720 * var(--gw)), 40px);
+    height: clamp(31px, calc(49 / 720 * var(--gw)), 40px);
+    border-radius: 12px;
+    border: 2px solid rgba(184, 154, 121, 0.48);
+    background: linear-gradient(180deg, rgba(76, 50, 54, 0.96), rgba(39, 31, 48, 0.96));
+    color: #e7c99f;
+    font-size: clamp(21px, calc(36 / 720 * var(--gw)), 29px);
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 5px 12px rgba(0, 0, 0, 0.25);
+}
+
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(7px, calc(14 / 720 * var(--gw)), 11px);
 }
 
 .menu-item-btn {
+    --tile-bg: rgba(45, 55, 96, 0.94);
+    --tile-border: rgba(115, 139, 200, 0.58);
+    --tile-glow: rgba(115, 139, 200, 0.12);
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     width: 100%;
-    padding: 9px 12px;
-    background: rgba(255, 255, 255, 0.04);
-    border: none;
-    border-radius: 8px;
-    color: #fff;
-    font-size: 14px;
-    font-weight: 700;
+    aspect-ratio: 1 / 1;
+    min-width: 0;
+    padding: clamp(5px, calc(10 / 720 * var(--gw)), 8px) 4px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 38%),
+        var(--tile-bg);
+    border: 1px solid var(--tile-border);
+    border-radius: 14px;
+    color: #edf1ff;
+    font-size: clamp(11px, calc(18 / 720 * var(--gw)), 14px);
+    font-weight: 900;
     font-family: inherit;
     cursor: pointer;
-    transition: background 0.15s;
-    gap: 10px;
-    text-align: left;
+    transition: transform 0.12s ease, filter 0.15s ease, box-shadow 0.15s ease;
+    gap: clamp(4px, calc(7 / 720 * var(--gw)), 7px);
+    text-align: center;
+    box-shadow:
+        0 7px 14px rgba(0, 0, 0, 0.22),
+        0 0 0 1px rgba(255, 255, 255, 0.035) inset,
+        0 0 18px var(--tile-glow);
+}
+
+.menu-item-btn:nth-child(1) { --tile-bg: rgba(43, 64, 113, 0.96); --tile-border: rgba(112, 155, 222, 0.6); }
+.menu-item-btn:nth-child(2) { --tile-bg: rgba(41, 82, 94, 0.96); --tile-border: rgba(100, 178, 190, 0.58); }
+.menu-item-btn:nth-child(3) { --tile-bg: rgba(107, 80, 40, 0.96); --tile-border: rgba(207, 163, 75, 0.62); }
+.menu-item-btn:nth-child(4) { --tile-bg: rgba(61, 51, 105, 0.96); --tile-border: rgba(149, 129, 222, 0.58); }
+.menu-item-btn:nth-child(5) { --tile-bg: rgba(61, 91, 53, 0.96); --tile-border: rgba(143, 184, 101, 0.58); }
+.menu-item-btn:nth-child(6) { --tile-bg: rgba(105, 58, 43, 0.96); --tile-border: rgba(218, 134, 83, 0.62); }
+
+@media (hover: hover) and (pointer: fine) {
+    .menu-item-btn:hover {
+        filter: brightness(1.08);
+        transform: translateY(-2px);
+    }
 }
 
 .menu-item-btn:active {
-    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(1px) scale(0.97);
+}
+
+.menu-item-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(24px, calc(38 / 720 * var(--gw)), 32px);
+    height: clamp(24px, calc(38 / 720 * var(--gw)), 32px);
+    font-size: clamp(19px, calc(31 / 720 * var(--gw)), 26px);
+    line-height: 1;
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.24);
+}
+
+.menu-item-btn .hud-player-avatar {
+    border-radius: 12px;
+    color: #24304f;
+    font-size: clamp(13px, calc(22 / 720 * var(--gw)), 18px);
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12);
+}
+
+.menu-item-text {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    line-height: 1.05;
+}
+
+.menu-soon-btn {
+    --tile-bg: rgba(25, 30, 51, 0.88);
+    --tile-border: rgba(135, 126, 160, 0.24);
+    --tile-glow: transparent;
+}
+
+.menu-item-btn:disabled {
+    cursor: default;
+    opacity: 0.58;
+    filter: grayscale(0.15);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+.menu-item-btn:disabled:active {
+    transform: none;
 }
 
 .hud-player-avatar {
@@ -573,12 +749,14 @@ body {
     justify-content: center;
     align-items: center;
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .modal-overlay.active {
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
 }
 
@@ -623,6 +801,7 @@ body {
 .modal-content-scroll {
     width: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     flex-grow: 1;
     margin-bottom: 20px;
     padding-right: 6px;
@@ -694,7 +873,7 @@ body {
 
 .leaderboard-tabs {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
     width: 100%;
     margin-bottom: 12px;
@@ -703,6 +882,7 @@ body {
 .leaderboard-tab-btn {
     padding: 8px 0;
     font-size: 13px;
+    min-height: 44px;
 }
 
 .leaderboard-tab-btn.active {
@@ -723,6 +903,7 @@ body {
 .shop-tab-btn {
     padding: 8px 0;
     font-size: 14px;
+    min-height: 44px;
 }
 
 .shop-item-row {
@@ -749,8 +930,10 @@ body {
 
 .shop-item-info {
     flex-grow: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
+    overflow-wrap: anywhere;
 }
 
 .shop-item-name {
@@ -767,6 +950,11 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
+}
+
+.shop-item-actions .paper-button {
+    min-height: 44px;
 }
 
 .shop-btn-buy {
@@ -852,6 +1040,7 @@ body {
     width: 100%;
     padding: 12px 0;
     font-size: 16px;
+    min-height: 48px;
 }
 
 /* Resume Panel Box Layout */
@@ -866,6 +1055,39 @@ body {
 .resume-btn {
     padding: 12px 0;
     font-size: 16px;
+    min-height: 48px;
+}
+
+@container game (max-width: 380px) {
+    .shop-item-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px 8px;
+        align-items: center;
+        padding: 10px;
+    }
+
+    .shop-item-row:not(:has(.shop-item-preview)) .shop-item-info {
+        grid-column: 1 / -1;
+    }
+
+    .shop-item-preview {
+        margin-right: 0;
+    }
+
+    .shop-item-actions {
+        grid-column: 1 / -1;
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .shop-item-actions .paper-button,
+    .shop-btn-buy {
+        flex: 1 1 0;
+        min-width: 0;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
 }
 
 .gameover-actions {
@@ -908,6 +1130,16 @@ body {
    чтобы на коротких вьюпортах панель бустеров не наезжала на нижний край. */
 @media (max-height: 560px) and (orientation: portrait) {
     .boosters-container { top: 40%; gap: calc(20 / 1280 * 100%); }
+}
+
+@media (orientation: landscape) {
+    :root {
+        --hud-plate-w: 64px;
+        --hud-right-w: 116px;
+        --hud-btn: 36px;
+    }
+
+    .notch-safe-zone { display: none; }
 }
 
 /* Landscape on narrow height — overlay only, never affects layout */

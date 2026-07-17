@@ -1,5 +1,29 @@
 apply plugin: 'com.android.application'
 
+def signingProperties = new Properties()
+def signingPropertiesPath = System.getenv('CAT_DROP_KEYSTORE_PROPERTIES') ?:
+        new File(System.getProperty('user.home'), '.catdrop/keystore.properties').absolutePath
+def signingPropertiesFile = file(signingPropertiesPath)
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.withInputStream { signingProperties.load(it) }
+}
+
+def signingSetting = { String propertyName, String environmentName ->
+    System.getenv(environmentName) ?: signingProperties.getProperty(propertyName)
+}
+def releaseStoreFile = signingSetting('storeFile', 'CAT_DROP_KEYSTORE')
+def releaseStorePassword = signingSetting('storePassword', 'CAT_DROP_STORE_PASSWORD')
+def releaseKeyAlias = signingSetting('keyAlias', 'CAT_DROP_KEY_ALIAS')
+def releaseKeyPassword = signingSetting('keyPassword', 'CAT_DROP_KEY_PASSWORD')
+def releaseSigningReady = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+def releaseArtifactRequested = gradle.startParameter.taskNames.any { taskName ->
+    def normalized = taskName.toLowerCase()
+    normalized.endsWith('assemblerelease') || normalized.endsWith('bundlerelease')
+}
+if (releaseArtifactRequested && !releaseSigningReady) {
+    throw new GradleException("Release signing is not configured. Use the protected Cat Drop keystore properties file.")
+}
+
 android {
     namespace = "com.example.catdropevolution"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +31,8 @@ android {
         applicationId "com.catdrop.evolution2"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "2.1"
+        versionCode 5
+        versionName "2.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,17 +41,19 @@ android {
         }
     }
     signingConfigs {
-        release {
-            storeFile file("release-key.keystore")
-            storePassword "catdrop123"
-            keyAlias "release-key-alias"
-            keyPassword "catdrop123"
+        if (releaseSigningReady) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            if (releaseSigningReady) signingConfig signingConfigs.release
         }
     }
 }

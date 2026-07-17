@@ -1,21 +1,13 @@
-const CACHE_NAME = 'cat-drop-v122'; // bumped: clamp drop spawn position strictly to inner walls
-const AUDIO_FILES = [
-  'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
-  'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',
-  'drop_mystic.wav', 'merge_mystic.wav', 'game_over_mystic.wav',
-  'drop_rapper.wav', 'merge_rapper.wav', 'game_over_rapper.wav',
-  'drop_zombie.wav', 'merge_zombie.wav', 'game_over_zombie.wav',
-  'drop_vampire.wav', 'merge_vampire.wav', 'game_over_vampire.wav',
-  'drop_oldman.wav', 'merge_oldman.wav', 'game_over_oldman.wav',
-].map(f => './assets/audio/' + f);
+const CACHE_NAME = 'cat-drop-v143'; // 6 чиптюн-паков: 3 с битом + 3 спокойных
+const CORE_AUDIO_FILES = [
+  './assets/audio/bgm.wav',
+  './assets/audio/drop.wav',
+  './assets/audio/merge.wav',
+  './assets/audio/game_over.wav',
+];
 
-const SPRITE_FILES = [
-  ...Array.from({length: 11}, (_, i) => `./assets/sprites/cat_${i+1}.png`),
-  './assets/sprites/skin_rapper.png',
-  './assets/sprites/skin_zombie.png',
-  './assets/sprites/skin_vampire.png',
-  './assets/sprites/skin_bard.png',
-  './assets/sprites/skin_oldman.png',
+const CORE_SPRITE_FILES = [
+  ...Array.from({length: 4}, (_, i) => `./assets/sprites/cat_${i+1}.png`),
   './assets/sprites/needle.png',
 ];
 
@@ -32,12 +24,12 @@ const ASSETS_TO_CACHE = [
   './js/telegram.js',
   './js/physics.js',
   './js/audio.js',
+  './js/play_games.js',
   './manifest.json',
-  './assets/dev-cat-peek-peace.png',
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',
-  ...AUDIO_FILES,
-  ...SPRITE_FILES  // BUG-008 fix: кэшируем спрайты при установке — игра работает оффлайн
+  ...CORE_AUDIO_FILES,
+  ...CORE_SPRITE_FILES
 ];
 
 self.addEventListener('install', event => {
