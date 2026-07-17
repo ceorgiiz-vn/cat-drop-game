@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v143'; // 6 чиптюн-паков: 3 с битом + 3 спокойных
+const CACHE_NAME = 'cat-drop-v144'; // 6 чиптюн-паков + диагностика (Sentry/чёрный ящик)
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.wav',
   './assets/audio/drop.wav',
@@ -16,6 +16,9 @@ const ASSETS_TO_CACHE = [
   './index.html',
   './style.css',
   './js/matter.min.js',
+  './js/sentry.min.js',
+  './js/diagnostics.js',
+  './js/diagnostics_watchdogs.js',
   './js/game.js',
   './js/game_modes.js',
   './js/state.js',
@@ -25,6 +28,7 @@ const ASSETS_TO_CACHE = [
   './js/physics.js',
   './js/audio.js',
   './js/play_games.js',
+  './js/cloud_save.js',
   './manifest.json',
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',

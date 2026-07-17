@@ -36,6 +36,10 @@ const PlayGames = (function() {
         try {
             const result = await playGamesPlugin.signIn({ silent });
             isAuthenticated = result?.signedIn === true;
+            // Облачный сейв (надстройка): подтянуть/слить прогресс из облака.
+            if (isAuthenticated) {
+                try { if (window.CloudSave) window.CloudSave.onSignedIn(playGamesPlugin); } catch (e) {}
+            }
         } catch (e) {
             isAuthenticated = false;
         }
