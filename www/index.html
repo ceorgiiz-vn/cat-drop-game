@@ -14,13 +14,19 @@
 
     <title>Cat Drop 2</title>
     <link rel="stylesheet" href="style.css?v=44">
+
+    <!-- Диагностика: локальный Sentry SDK + «чёрный ящик». Только наблюдает, игру не меняет. -->
+    <script src="js/sentry.min.js?v=1"></script>
+    <script src="js/diagnostics.js?v=1"></script>
+    <script src="js/diagnostics_watchdogs.js?v=1"></script>
+
     <script src="js/telegram.js?v=1"></script>
 
     <!-- Matter.js Physics Engine -->
     <script src="js/matter.min.js"></script>
 
     <!-- State and Session Manager -->
-    <script src="js/state.js?v=5"></script>
+    <script src="js/state.js?v=6"></script>
     <script src="js/game_modes.js?v=7"></script>
     <script src="js/sprite.js?v=17"></script>
     <script src="js/responsive.js?v=2"></script>
@@ -302,8 +308,11 @@
     <!-- Frozen Matter.js physics baseline (do not tune in game.js) -->
     <script src="js/physics.js?v=8"></script>
 
+    <!-- Cloud save (надстройка над локальным сейвом через Play Games Snapshots) -->
+    <script src="js/cloud_save.js?v=1"></script>
+
     <!-- GPGS & App Native Events -->
-    <script src="js/play_games.js?v=2"></script>
+    <script src="js/play_games.js?v=3"></script>
 
     <!-- Core Game Controller Logic -->
     <script src="js/game.js?v=82"></script>

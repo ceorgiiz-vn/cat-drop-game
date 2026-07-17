@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v122'; // bumped: clamp drop spawn position strictly to inner walls
+const CACHE_NAME = 'cat-drop-v123'; // bumped: add diagnostics (Sentry SDK + black box) — observe-only, no gameplay change
 const AUDIO_FILES = [
   'bgm.wav', 'bgm_mystic.wav', 'bgm_rapper.wav', 'bgm_zombie.wav', 'bgm_vampire.wav', 'bgm_oldman.wav',
   'drop.wav', 'merge.wav', 'game_over.wav', 'dev_egg.wav',
@@ -24,6 +24,9 @@ const ASSETS_TO_CACHE = [
   './index.html',
   './style.css',
   './js/matter.min.js',
+  './js/sentry.min.js',
+  './js/diagnostics.js',
+  './js/diagnostics_watchdogs.js',
   './js/game.js',
   './js/game_modes.js',
   './js/state.js',
@@ -32,6 +35,7 @@ const ASSETS_TO_CACHE = [
   './js/telegram.js',
   './js/physics.js',
   './js/audio.js',
+  './js/cloud_save.js',
   './manifest.json',
   './assets/dev-cat-peek-peace.png',
   './assets/app-icon-192.png',

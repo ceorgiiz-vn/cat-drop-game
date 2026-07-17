@@ -41,6 +41,8 @@ const PlayGames = (function() {
             if (result && result.isAuthenticated) {
                 isAuthenticated = true;
                 console.log("GPGS: Silently signed in!");
+                // Облачный сейв (надстройка): подтянуть/слить прогресс из облака.
+                try { if (window.CloudSave) window.CloudSave.onSignedIn(playGamesPlugin); } catch (e) {}
             }
         } catch (e) {
             console.log("GPGS: Silent sign-in unavailable (GPGS not configured yet).", e);

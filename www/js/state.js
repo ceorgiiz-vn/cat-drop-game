@@ -116,6 +116,8 @@ const GameState = {
         };
         localStorage.setItem("cat_drop_save_data", JSON.stringify(data));
         this.triggerStateChange();
+        // Облачный сейв (надстройка): пуш в Play Games, если залогинен. Без влияния на локалку.
+        try { if (window.CloudSave) window.CloudSave.onLocalSave(); } catch (e) {}
     },
 
     getTodayKey() {
