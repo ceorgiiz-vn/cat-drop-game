@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v146'; // fix: Play Games initialize() — общий рейтинг/вход
+const CACHE_NAME = 'cat-drop-v147'; // layout: верхняя панель к потолку, стакан к низу (высокие экраны)
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.wav',
   './assets/audio/drop.wav',

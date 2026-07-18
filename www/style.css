@@ -86,9 +86,10 @@ body {
     }
 }
 @media (max-aspect-ratio: 9/16) {
+    /* Высокий телефон: обёртка во весь экран (стакан прижимаем к низу — см. конец файла). */
     .game-wrapper {
         width: var(--app-width);
-        height: calc(var(--app-width) * 16 / 9);
+        height: var(--app-height);
     }
 }
 
@@ -1164,4 +1165,22 @@ body {
 
 #rotate-hint.visible {
     display: block;
+}
+
+/* ================================================================
+   Раскладка для высоких экранов (выше 9:16): стакан 9:16 прижат к НИЗУ,
+   верхняя панель — к потолку, пустая полоса сверху заполняется панелью.
+   Размещено в конце файла, чтобы перебить базовые правила канваса/бустеров.
+   ================================================================ */
+@media (max-aspect-ratio: 9/16) {
+    #game-canvas,
+    .vignette-danger {
+        top: auto !important;
+        bottom: 0 !important;
+        height: var(--gh) !important;
+    }
+    .boosters-container {
+        top: auto !important;
+        bottom: calc(0.30 * var(--gh)) !important;
+    }
 }
