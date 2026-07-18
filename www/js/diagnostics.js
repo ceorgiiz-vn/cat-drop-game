@@ -14,7 +14,7 @@
     'use strict';
 
     // Версию бампаем при каждой новой сборке — так Sentry группирует отчёты по билду.
-    var BUILD = 'cat-drop@sw123-diag2';
+    var BUILD = 'cat-drop@sw144-diag3';
     var SENTRY_DSN = 'https://23bffdf39a49a470777b7a8631573dd8@o4511750724976640.ingest.de.sentry.io/4511750742343760';
 
     // Пороги
@@ -124,9 +124,29 @@
     var maxFrame10s = 0, maxWindowStart = performance.now();
     var longTasks = 0;
 
+    // Фон/пауза: когда приложение свёрнуто, requestAnimationFrame останавливается,
+    // и кадр возобновления имеет dt = вся длительность паузы (секунды). Это НЕ игровой
+    // рывок — такие кадры пропускаем, иначе Sentry заваливается ложными «Long frame».
+    var FREEZE_CEILING_MS = 4000; // выше — почти наверняка фон/пауза, а не рывок в игре
+    var skipNextFrame = false;
+    var appHidden = (typeof document !== 'undefined' && document.hidden) || false;
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) { appHidden = true; }
+            else { appHidden = false; skipNextFrame = true; }
+        });
+    }
+
     function recordFrame(now) {
         var dt = now - lastFrame;
         lastFrame = now;
+
+        // Пропускаем кадр сразу после возврата из фона (dt = длительность паузы, не рывок).
+        if (skipNextFrame || appHidden) {
+            skipNextFrame = false;
+            requestAnimationFrame(recordFrame);
+            return;
+        }
 
         ring.push(Math.round(dt));
         if (ring.length > ringMax) ring.shift();
@@ -141,8 +161,8 @@
         if (dt > maxFrame10s) maxFrame10s = dt;
         if (now - maxWindowStart >= 10000) { maxFrame10s = dt; maxWindowStart = now; }
 
-        // Детектор рывка/зависания
-        if (dt >= FREEZE_MS && (now - lastReport) > REPORT_COOLDOWN_MS) {
+        // Детектор рывка/зависания (игнорируем фоновые паузы выше потолка)
+        if (dt >= FREEZE_MS && dt <= FREEZE_CEILING_MS && (now - lastReport) > REPORT_COOLDOWN_MS) {
             lastReport = now;
             report('freeze', 'Long frame ' + Math.round(dt) + 'ms', {
                 frame_ms: Math.round(dt),
@@ -165,7 +185,7 @@
             var obs = new PerformanceObserver(function (list) {
                 list.getEntries().forEach(function (entry) {
                     longTasks++;
-                    if (entry.duration >= LONGTASK_MS && (performance.now() - lastReport) > REPORT_COOLDOWN_MS) {
+                    if (entry.duration >= LONGTASK_MS && entry.duration <= FREEZE_CEILING_MS && !appHidden && (performance.now() - lastReport) > REPORT_COOLDOWN_MS) {
                         lastReport = performance.now();
                         report('longtask', 'Long task ' + Math.round(entry.duration) + 'ms', {
                             duration_ms: Math.round(entry.duration),

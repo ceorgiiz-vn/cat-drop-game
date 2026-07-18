@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v144'; // 6 чиптюн-паков + диагностика (Sentry/чёрный ящик)
+const CACHE_NAME = 'cat-drop-v145'; // диагностика: фикс ложных «Long frame» от фоновых пауз
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.wav',
   './assets/audio/drop.wav',
