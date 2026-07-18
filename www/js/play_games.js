@@ -25,6 +25,11 @@ const PlayGames = (function() {
             }
 
             if (playGamesPlugin) {
+                // Плагин требует initialize() ПЕРЕД любыми методами (вход/лидеры/сейв),
+                // иначе окно входа появляется, но вход не завершается. Это и ломало общий рейтинг.
+                if (playGamesPlugin.initialize) {
+                    try { await playGamesPlugin.initialize(); } catch (e) { console.error("PlayGames initialize failed:", e); }
+                }
                 await silentSignIn();
             }
         } catch (e) {

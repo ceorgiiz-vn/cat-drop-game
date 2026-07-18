@@ -8,6 +8,12 @@
 
 ## 2026-07-18 · versionCode 9 / v2.6 (готовится к сборке)
 
+- **Фикс общего рейтинга (Google Play Games).** Вход в Play Games открывался, но не завершался →
+  рейтинг оставался локальным (per-device). Причина: плагин требует вызвать `initialize()` ПЕРЕД
+  входом/лидерами/сейвом, а его не вызывали. Добавлен `initialize()` перед silent-входом.
+  Блок: Play Games. Файлы: `www/js/play_games.js`, `www/index.html` (v5), `www/sw.js` (кэш v146).
+  ⚠️ Зависит также от публикации таблицы лидеров в Play Console.
+
 - **Очистка проекта + управление.** Папка 1.2 ГБ → 345 МБ (удалены старые сборки, кэш, `_apk_old`, `tmp`,
   `competitive-edition` [идеи → `docs/competitive-edition/`]). `www/screenshots` вынесены в `store-listing/`
   (APK −18 МБ). Создан `AGENTS.md` (единый управляющий файл всех ИИ) + система версий; `npm run clean`.

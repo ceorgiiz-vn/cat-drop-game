@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v145'; // диагностика: фикс ложных «Long frame» от фоновых пауз
+const CACHE_NAME = 'cat-drop-v146'; // fix: Play Games initialize() — общий рейтинг/вход
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.wav',
   './assets/audio/drop.wav',
