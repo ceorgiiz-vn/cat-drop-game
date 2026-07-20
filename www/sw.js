@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v147'; // layout: верхняя панель к потолку, стакан к низу (высокие экраны)
+const CACHE_NAME = 'cat-drop-v148'; // фон-клетка на весь экран + тёмные системные полосы Android
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.wav',
   './assets/audio/drop.wav',

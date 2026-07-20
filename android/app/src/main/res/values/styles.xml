@@ -13,6 +13,11 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Тёмные системные полосы (статус-бар/навигация) под фон игры, светлые значки -->
+        <item name="android:statusBarColor">#141724</item>
+        <item name="android:navigationBarColor">#141724</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
 

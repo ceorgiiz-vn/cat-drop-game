@@ -3289,6 +3289,7 @@
         }
 
         root.style.setProperty('--bg-color', colors.paperColor);
+        root.style.setProperty('--stripe-color', colors.stripeColor);
         root.style.setProperty('--border-color', colors.btnNormal);
         root.style.setProperty('--accent-color', colors.best);
         root.style.setProperty('--btn-normal', colors.btnNormal);

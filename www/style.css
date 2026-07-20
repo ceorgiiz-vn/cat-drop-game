@@ -2,6 +2,7 @@
 
 :root {
     --bg-color: #141724;
+    --stripe-color: #1b1f30;
     --card-bg: rgba(20, 23, 36, 0.7);
     --border-color: #5c6c9c;
     --text-color: #e0e6ff;
@@ -70,6 +71,12 @@ body {
     max-height: 100%;
     aspect-ratio: 9 / 16;
     background-color: var(--bg-color);
+    /* Клетка-фон (гингем) на всю обёртку — чтобы над стаканом фон не обрывался
+       на пустой цвет. Совпадает с канвасом: полосы 45, шаг 100 (в дизайн-px), масштаб --gs. */
+    background-image:
+        repeating-linear-gradient(to right, var(--stripe-color) 0 calc(45px * var(--gs)), transparent calc(45px * var(--gs)) calc(100px * var(--gs))),
+        repeating-linear-gradient(to bottom, var(--stripe-color) 0 calc(45px * var(--gs)), transparent calc(45px * var(--gs)) calc(100px * var(--gs)));
+    background-position: bottom left;
     box-shadow: 0 10px 40px rgba(0,0,0,0.6);
     overflow: hidden;
     display: flex;
