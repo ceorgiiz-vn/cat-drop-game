@@ -76,7 +76,9 @@ body {
     background-image:
         repeating-linear-gradient(to right, var(--stripe-color) 0 calc(45px * var(--gs)), transparent calc(45px * var(--gs)) calc(100px * var(--gs))),
         repeating-linear-gradient(to bottom, var(--stripe-color) 0 calc(45px * var(--gs)), transparent calc(45px * var(--gs)) calc(100px * var(--gs)));
-    background-position: bottom left;
+    /* Привязываем начало клетки ровно к верхнему краю канваса (стакан прижат к низу),
+       чтобы клетки фона и канваса совпадали по фазе — без стыка. */
+    background-position: 0 calc(var(--app-height) - var(--gh));
     box-shadow: 0 10px 40px rgba(0,0,0,0.6);
     overflow: hidden;
     display: flex;
