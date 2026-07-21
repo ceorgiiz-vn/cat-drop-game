@@ -6,19 +6,19 @@ const GameAudio = (function() {
     const scheduleAudioTask = globalThis.setTimeout.bind(globalThis);
 
     const SETS = {
-        Default: { suffix: "", bgm: "bgm.wav" },
-        Mystic:  { suffix: "_mystic",  bgm: "bgm_mystic.wav" },
-        Rapper:  { suffix: "_rapper",  bgm: "bgm_rapper.wav" },
-        Zombie:  { suffix: "_zombie",  bgm: "bgm_zombie.wav" },
-        Vampire: { suffix: "_vampire", bgm: "bgm_vampire.wav" },
-        Oldman:  { suffix: "_oldman",  bgm: "bgm_oldman.wav" },
+        Default: { suffix: "", bgm: "bgm.ogg" },
+        Mystic:  { suffix: "_mystic",  bgm: "bgm_mystic.ogg" },
+        Rapper:  { suffix: "_rapper",  bgm: "bgm_rapper.ogg" },
+        Zombie:  { suffix: "_zombie",  bgm: "bgm_zombie.ogg" },
+        Vampire: { suffix: "_vampire", bgm: "bgm_vampire.ogg" },
+        Oldman:  { suffix: "_oldman",  bgm: "bgm_oldman.ogg" },
         // Новые чиптюн-треки (BGM), SFX — стандартные (suffix "")
-        ChipCozy:  { suffix: "", bgm: "bgm_chip_cozy.wav" },
-        ChipSunny: { suffix: "", bgm: "bgm_chip_sunny.wav" },
-        ChipMoon:  { suffix: "", bgm: "bgm_chip_moon.wav" },
-        ChipCozyCalm:  { suffix: "", bgm: "bgm_chip_cozy_calm.wav" },
-        ChipSunnyCalm: { suffix: "", bgm: "bgm_chip_sunny_calm.wav" },
-        ChipMoonCalm:  { suffix: "", bgm: "bgm_chip_moon_calm.wav" }
+        ChipCozy:  { suffix: "", bgm: "bgm_chip_cozy.ogg" },
+        ChipSunny: { suffix: "", bgm: "bgm_chip_sunny.ogg" },
+        ChipMoon:  { suffix: "", bgm: "bgm_chip_moon.ogg" },
+        ChipCozyCalm:  { suffix: "", bgm: "bgm_chip_cozy_calm.ogg" },
+        ChipSunnyCalm: { suffix: "", bgm: "bgm_chip_sunny_calm.ogg" },
+        ChipMoonCalm:  { suffix: "", bgm: "bgm_chip_moon_calm.ogg" }
     };
 
     let ctx = null;
@@ -60,8 +60,8 @@ const GameAudio = (function() {
     }
 
     function sfxFile(type, suffix) {
-        if (type === "game_over") return `game_over${suffix}.wav`;
-        return `${type}${suffix}.wav`;
+        if (type === "game_over") return `game_over${suffix}.ogg`;
+        return `${type}${suffix}.ogg`;
     }
 
     function bufferKey(setName, type) {
@@ -100,25 +100,32 @@ const GameAudio = (function() {
         return promise;
     }
 
-    function ensureSoundSet(setName) {
+    function ensureSoundSet(setName, includeBgm = true) {
         const types = ["drop", "merge", "game_over"];
-        if (ENABLE_BGM) types.push("bgm");
+        if (ENABLE_BGM && includeBgm) types.push("bgm");
         return Promise.all(types.map(type => ensureBuffer(setName, type)));
     }
 
     async function preload(setName, callback) {
+        const activeSet = SETS[setName] ? setName : "Default";
         try {
             await ensureContext();
-            const activeSet = SETS[setName] ? setName : "Default";
-            const tasks = [ensureSoundSet("Default")];
-            if (activeSet !== "Default") tasks.push(ensureSoundSet(activeSet));
+            // На старте ждём ТОЛЬКО короткие эффекты — они лёгкие.
+            // Музыку (самый тяжёлый декод) грузим ниже, уже после запуска игры,
+            // чтобы не отнимать процессор у первых кадров.
+            const tasks = [ensureSoundSet("Default", false)];
+            if (activeSet !== "Default") tasks.push(ensureSoundSet(activeSet, false));
             await Promise.all(tasks);
         } catch (err) {
             console.error("Audio preload error:", err);
         } finally {
             ready = true;
-            maybeStartBGM(); // буферы готовы: если музыку уже хотели (был тап) — стартуем сразу
             if (callback) callback();
+            // Отложенная догрузка музыки: ensureBuffer сам вызовет maybeStartBGM,
+            // когда буфер будет готов (если музыку уже хотели включить).
+            if (ENABLE_BGM) {
+                scheduleAudioTask(() => { ensureBuffer(activeSet, "bgm"); }, 1200);
+            }
         }
     }
 
@@ -299,7 +306,7 @@ const GameAudio = (function() {
         if (!sfxEnabled) return;
         resumeIfNeeded().then(() => {
             if (!devEggPromise) {
-                devEggPromise = loadBuffer("assets/audio/dev_egg.wav")
+                devEggPromise = loadBuffer("assets/audio/dev_egg.ogg")
                     .then(buffer => {
                         devEggBuffer = buffer;
                         return buffer;

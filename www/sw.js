@@ -1,14 +1,21 @@
-const CACHE_NAME = 'cat-drop-v149'; // фон-клетка без стыка (фаза по верху канваса)
+const CACHE_NAME = 'cat-drop-v150'; // старт: локальные шрифты, аудио OGG, отложенная музыка
 const CORE_AUDIO_FILES = [
-  './assets/audio/bgm.wav',
-  './assets/audio/drop.wav',
-  './assets/audio/merge.wav',
-  './assets/audio/game_over.wav',
+  './assets/audio/bgm.ogg',
+  './assets/audio/drop.ogg',
+  './assets/audio/merge.ogg',
+  './assets/audio/game_over.ogg',
 ];
 
 const CORE_SPRITE_FILES = [
   ...Array.from({length: 4}, (_, i) => `./assets/sprites/cat_${i+1}.png`),
   './assets/sprites/needle.png',
+];
+
+// Шрифты локальные (были с Google CDN) — кэшируем, чтобы текст не мигал и работал офлайн.
+const CORE_FONT_FILES = [
+  ...[400, 700, 800, 900].map(w => `./assets/fonts/nunito-${w}-latin.woff2`),
+  ...[400, 700, 800, 900].map(w => `./assets/fonts/nunito-${w}-cyrillic.woff2`),
+  ...[400, 700, 800].map(w => `./assets/fonts/outfit-${w}-latin.woff2`),
 ];
 
 const ASSETS_TO_CACHE = [
@@ -33,7 +40,8 @@ const ASSETS_TO_CACHE = [
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',
   ...CORE_AUDIO_FILES,
-  ...CORE_SPRITE_FILES
+  ...CORE_SPRITE_FILES,
+  ...CORE_FONT_FILES
 ];
 
 self.addEventListener('install', event => {
