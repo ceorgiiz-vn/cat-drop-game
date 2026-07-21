@@ -397,10 +397,10 @@ const GameState = {
         // Check assignments
         for (const skinId in this.skin_assignments) {
             if (this.skin_assignments[skinId] === level) {
-                return `assets/sprites/skin_${skinId.toLowerCase()}.png`;
+                return `assets/sprites/skin_${skinId.toLowerCase()}.webp`;
             }
         }
-        return `assets/sprites/cat_${level}.png`;
+        return `assets/sprites/cat_${level}.webp`;
     },
 
     // Session logic

@@ -87,11 +87,11 @@
     }
 
     function ensureCatImage(level) {
-        return ensureImage(catImages, level, `assets/sprites/cat_${level}.png`);
+        return ensureImage(catImages, level, `assets/sprites/cat_${level}.webp`);
     }
 
     function ensureSkinImage(skinId) {
-        return ensureImage(skinImages, skinId, `assets/sprites/skin_${skinId.toLowerCase()}.png`);
+        return ensureImage(skinImages, skinId, `assets/sprites/skin_${skinId.toLowerCase()}.webp`);
     }
 
     function ensureDevPeekImage() {
@@ -3022,7 +3022,7 @@
             skinsOrder.forEach(skinId => {
                 const info = premiumSkins[skinId];
                 const isOwned = GameState.purchased_skins.includes(skinId);
-                const imgPath = `assets/sprites/skin_${skinId.toLowerCase()}.png`;
+                const imgPath = `assets/sprites/skin_${skinId.toLowerCase()}.webp`;
 
                 const row = document.createElement("div");
                 row.className = "shop-item-row";

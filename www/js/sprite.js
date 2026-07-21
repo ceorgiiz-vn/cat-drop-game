@@ -123,7 +123,7 @@ const CatSprite = (function() {
     }
 
     const mouseImg = new Image();
-    mouseImg.src = "assets/sprites/needle.png";
+    mouseImg.src = "assets/sprites/needle.webp";
 
     /** Cartoon mouse — head at −Y, tail at +Y. Use angle π so head points down (falling). */
     function drawMouse(ctx, radius, time, angle, style) {

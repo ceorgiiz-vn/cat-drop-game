@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v150'; // старт: локальные шрифты, аудио OGG, отложенная музыка
+const CACHE_NAME = 'cat-drop-v151'; // спрайты WebP (в 4.4 раза легче, память в разы меньше)
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.ogg',
   './assets/audio/drop.ogg',
@@ -7,8 +7,8 @@ const CORE_AUDIO_FILES = [
 ];
 
 const CORE_SPRITE_FILES = [
-  ...Array.from({length: 4}, (_, i) => `./assets/sprites/cat_${i+1}.png`),
-  './assets/sprites/needle.png',
+  ...Array.from({length: 4}, (_, i) => `./assets/sprites/cat_${i+1}.webp`),
+  './assets/sprites/needle.webp',
 ];
 
 // Шрифты локальные (были с Google CDN) — кэшируем, чтобы текст не мигал и работал офлайн.
