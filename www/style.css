@@ -92,6 +92,8 @@
 :root {
     --bg-color: #141724;
     --stripe-color: #1b1f30;
+    /* На сколько стакан приподнят над низом экрана (0 для широких экранов/планшетов). */
+    --cup-bottom: 0px;
     --card-bg: rgba(20, 23, 36, 0.7);
     --border-color: #5c6c9c;
     --text-color: #e0e6ff;
@@ -167,7 +169,7 @@ body {
         repeating-linear-gradient(to bottom, var(--stripe-color) 0 calc(45px * var(--gs)), transparent calc(45px * var(--gs)) calc(100px * var(--gs)));
     /* Привязываем начало клетки ровно к верхнему краю канваса (стакан прижат к низу),
        чтобы клетки фона и канваса совпадали по фазе — без стыка. */
-    background-position: 0 calc(var(--app-height) - var(--gh));
+    background-position: 0 calc(var(--app-height) - var(--gh) - var(--cup-bottom));
     box-shadow: 0 10px 40px rgba(0,0,0,0.6);
     overflow: hidden;
     display: flex;
@@ -1271,10 +1273,16 @@ body {
    Размещено в конце файла, чтобы перебить базовые правила канваса/бустеров.
    ================================================================ */
 @media (max-aspect-ratio: 9/16) {
+    /* Стакан приподнят над системной панелью навигации (--sab) и слегка смещён к центру
+       свободного места — иначе на узких экранах (Z Fold, внешний экран) дно уходит
+       под кнопки, а меню висит слишком высоко. Фон-клетка следует за этим же смещением. */
+    :root {
+        --cup-bottom: calc(var(--sab) + (var(--app-height) - var(--gh) - var(--sab)) * 0.30);
+    }
     #game-canvas,
     .vignette-danger {
         top: auto !important;
-        bottom: 0 !important;
+        bottom: var(--cup-bottom) !important;
         height: var(--gh) !important;
     }
     .boosters-container {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v153'; // сторож вращения: реальный порог + версия 2.9
+const CACHE_NAME = 'cat-drop-v154'; // стакан приподнят над навигацией (Z Fold), фон следует за ним
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.ogg',
   './assets/audio/drop.ogg',
