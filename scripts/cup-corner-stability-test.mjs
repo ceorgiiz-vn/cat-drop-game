@@ -182,7 +182,13 @@ function clampLikeGame(body) {
     });
   }
 
-  Body.setAngularVelocity(body, body.angularVelocity * 0.94);
+  // Зеркалит game.js: у почти неподвижного кота остаточное вращение снимается полностью,
+  // иначе микро-отскоки в стыке стенки и дна раскручивают его бесконечно.
+  const CAT_REST_SPEED = 0.8;
+  const CAT_REST_SPIN = 0.12;
+  let av = body.angularVelocity * 0.94;
+  if (speed < CAT_REST_SPEED && Math.abs(av) < CAT_REST_SPIN) av = 0;
+  Body.setAngularVelocity(body, av);
 
   let x = body.position.x;
   let y = body.position.y;

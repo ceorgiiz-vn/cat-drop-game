@@ -6,7 +6,7 @@
   "scripts": {
     "start": "serve www -l tcp://0.0.0.0:${PORT:-8080} -n",
     "serve:local": "serve www -l tcp://0.0.0.0:8080 -n",
-    "check": "node scripts/release-check.mjs",
+    "check": "node scripts/release-check.mjs && node scripts/cup-corner-stability-test.mjs",
     "qa": "python scripts/qa_checks.py",
     "qa:full": "node scripts/full-game-qa.mjs",
     "clean": "node scripts/clean.mjs"

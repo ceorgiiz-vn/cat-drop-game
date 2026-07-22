@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v151'; // спрайты WebP (в 4.4 раза легче, память в разы меньше)
+const CACHE_NAME = 'cat-drop-v152'; // фикс вечного вращения кота в углу (покой лежащих котов)
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.ogg',
   './assets/audio/drop.ogg',

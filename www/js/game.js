@@ -226,6 +226,10 @@
     const CUP_CORNER_LANDING_MAX_SPEED = 20;
     const CUP_CORNER_LANDING_HEIGHT = 140;
     const CUP_CORNER_LANDING_SIDE_PAD = 100;
+    // Пороги «покоя»: ниже них кот считается лежащим и остаточное вращение снимается,
+    // чтобы микро-отскоки в стыке стенки и дна не раскручивали его бесконечно.
+    const CAT_REST_SPEED = 0.8;
+    const CAT_REST_SPIN = 0.12;
     const CUP_CORNER_REBOUND_MAX_SPEED = 2;
     const CUP_CORNER_REBOUND_HEIGHT = 70;
     const CUP_PIVOT_X = 360;
@@ -1076,9 +1080,15 @@
             });
         }
 
-        // 2. Apply angular damping to prevent infinite spinning in corners
+        // 2. Гашение вращения + честный «покой».
+        // Кот в стыке стенки и дна бесконечно микро-отскакивает (упругость 0.38), и каждый
+        // контакт подкручивает его. Своего затухания нет: трение воздуха = 0, «сон» тел выключен.
+        // Поэтому у ПОЧТИ НЕПОДВИЖНОГО кота снимаем остаточное вращение полностью — он честно
+        // ложится. Катящиеся и падающие коты (speed выше порога) ведут себя как раньше.
         if (!cat.isMouse) {
-            Body.setAngularVelocity(cat.body, cat.body.angularVelocity * 0.94);
+            let av = cat.body.angularVelocity * 0.94;
+            if (speed < CAT_REST_SPEED && Math.abs(av) < CAT_REST_SPIN) av = 0;
+            Body.setAngularVelocity(cat.body, av);
         }
 
         // 3. Out-of-bounds safety net: only teleport if the cat has genuinely glitched past the cup boundaries
