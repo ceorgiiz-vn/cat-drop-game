@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cat-drop-v152'; // фикс вечного вращения кота в углу (покой лежащих котов)
+const CACHE_NAME = 'cat-drop-v153'; // сторож вращения: реальный порог + версия 2.9
 const CORE_AUDIO_FILES = [
   './assets/audio/bgm.ogg',
   './assets/audio/drop.ogg',

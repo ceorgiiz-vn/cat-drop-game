@@ -117,12 +117,34 @@ ok(`вес www: ${totalMb.toFixed(1)} МБ (бюджет ${BUDGET_MB} МБ)`);
 const logs = ourJs.filter(f => /console\.log\(/.test(read(f))).map(rel);
 if (logs.length) warn(`console.log остался в: ${logs.join(", ")}`);
 
-/* ---------- 9. Версия приложения ---------- */
+/* ---------- 9. Версия приложения: должна быть БОЛЬШЕ всех уже собранных ---------- */
 const gradle = readFileSync(path.join(root, "android/app/build.gradle"), "utf8");
 const vc = gradle.match(/versionCode\s+(\d+)/);
 const vn = gradle.match(/versionName\s+"([^"]+)"/);
-if (!vc) fail("не найден versionCode в build.gradle");
-else ok(`версия для загрузки: versionCode ${vc[1]} / ${vn ? vn[1] : "?"} — убедись, что она БОЛЬШЕ уже загруженной`);
+if (!vc) {
+  fail("не найден versionCode в build.gradle");
+} else {
+  const current = Number(vc[1]);
+  // Ищем уже собранные пакеты в проекте — по ним видно, какие номера УЖЕ израсходованы.
+  const builtCodes = [];
+  const scanDirs = [root, path.join(root, "android/app/build/outputs")];
+  for (const dir of scanDirs) {
+    if (!existsSync(dir)) continue;
+    for (const f of walk(dir)) {
+      if (!/\.(aab|apk)$/i.test(f)) continue;
+      const m = path.basename(f).match(/vc(\d+)/i);
+      if (m) builtCodes.push(Number(m[1]));
+    }
+  }
+  const maxBuilt = builtCodes.length ? Math.max(...builtCodes) : 0;
+  if (maxBuilt && current <= maxBuilt) {
+    fail(`versionCode ${current} УЖЕ собирался (найден пакет с vc${maxBuilt}). ` +
+         `Play такую версию отклонит. Поставь versionCode ${maxBuilt + 1} в android/app/build.gradle.`);
+  } else {
+    ok(`версия для загрузки: versionCode ${current} / ${vn ? vn[1] : "?"}` +
+       (maxBuilt ? ` (последний собранный: vc${maxBuilt} — номер свободен ✔)` : ""));
+  }
+}
 
 /* ---------- Итог ---------- */
 if (warnings.length) {
