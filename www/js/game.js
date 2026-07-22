@@ -97,7 +97,7 @@
     function ensureDevPeekImage() {
         if (!devCatPeekImage) {
             devCatPeekImage = new Image();
-            devCatPeekImage.src = "assets/dev-cat-peek-peace.png?v=5";
+            devCatPeekImage.src = "assets/dev-cat-peek-peace.webp?v=5";
         }
         return devCatPeekImage;
     }
